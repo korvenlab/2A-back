@@ -1,0 +1,19 @@
+# Blueprint Render — ao criar o Web Service, aponte este repositório (só a pasta vira repo próprio).
+# Ajuste o nome do serviço e as variáveis em Dashboard → Environment.
+services:
+  - type: web
+    name: 2avendas-api
+    runtime: node
+    plan: free
+    region: oregon
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_VERSION
+        value: "22.12.0"
+      - key: FRONTEND_ORIGIN
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false

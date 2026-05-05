@@ -1,0 +1,7 @@
+node_modules
+dist
+supabase/.temp
+*.local
+.env
+.env.*
+!.env.example
