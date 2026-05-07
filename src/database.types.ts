@@ -364,8 +364,10 @@ export type Database = {
       }
       profiles: {
         Row: {
+          active: boolean
           avatar_url: string | null
           created_at: string
+          deleted_at: string | null
           email: string | null
           full_name: string | null
           id: string
@@ -373,8 +375,10 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          active?: boolean
           avatar_url?: string | null
           created_at?: string
+          deleted_at?: string | null
           email?: string | null
           full_name?: string | null
           id: string
@@ -382,8 +386,10 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          active?: boolean
           avatar_url?: string | null
           created_at?: string
+          deleted_at?: string | null
           email?: string | null
           full_name?: string | null
           id?: string

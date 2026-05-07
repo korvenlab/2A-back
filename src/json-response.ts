@@ -3,7 +3,12 @@ import type { ContentfulStatusCode } from "hono/utils/http-status";
 
 export const JSON_CONTENT_TYPE = "application/json; charset=utf-8";
 
-export type KorvenErrorCode = "UNAUTHORIZED" | "VALIDATION_ERROR" | "INTERNAL_ERROR" | "UNAVAILABLE";
+export type KorvenErrorCode =
+  | "UNAUTHORIZED"
+  | "VALIDATION_ERROR"
+  | "INTERNAL_ERROR"
+  | "UNAVAILABLE"
+  | "NOT_FOUND";
 
 export function jsonOk<T extends Record<string, unknown>>(c: Context, body: T, status: ContentfulStatusCode = 200) {
   c.header("Content-Type", JSON_CONTENT_TYPE);

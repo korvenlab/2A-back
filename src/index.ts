@@ -1,6 +1,7 @@
 import { serve } from "@hono/node-server";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
+import { adminUsersRoute } from "./admin-users-route.js";
 import { dashboardRoute } from "./dashboard-route.js";
 import { jsonFail, jsonOk } from "./json-response.js";
 import { metricsRoute } from "./metrics-route.js";
@@ -34,8 +35,9 @@ app.get("/", (c) =>
 
 app.route("/metrics", metricsRoute);
 app.route("/dashboard", dashboardRoute);
+app.route("/api/admin/users", adminUsersRoute);
 
-app.notFound((c) => jsonFail(c, 404, "Rota não encontrada.", "VALIDATION_ERROR"));
+app.notFound((c) => jsonFail(c, 404, "Rota não encontrada.", "NOT_FOUND"));
 
 app.onError((err, c) => {
   console.error("Unhandled API error:", err instanceof Error ? err.message : String(err));
