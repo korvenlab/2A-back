@@ -6,6 +6,7 @@ import { supabaseAdmin } from "./supabase/admin-client.js";
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const LEGACY_RBAC_ROLES = new Set(["admin", "vendedor", "cliente", "user"]);
+type LegacyRbacRole = "admin" | "vendedor" | "cliente" | "user";
 
 interface AppUserRow {
   id: string;
@@ -44,6 +45,11 @@ function parsePagination(
 function isRoleValueValid(value: string): boolean {
   // allow slugs like "admin", "user", "manager", "sales_lead"
   return /^[a-z][a-z0-9_-]{1,39}$/i.test(value);
+}
+
+function asLegacyRbacRole(value: string): LegacyRbacRole | null {
+  if (!LEGACY_RBAC_ROLES.has(value)) return null;
+  return value as LegacyRbacRole;
 }
 
 export const adminUsersRoute = new Hono();
@@ -152,7 +158,8 @@ adminUsersRoute.patch("/:id/role", async (c) => {
   if (up.error) return jsonFail(c, 503, up.error.message, "UNAVAILABLE");
 
   let syncedToUserRoles = false;
-  if (LEGACY_RBAC_ROLES.has(role)) {
+  const legacyRole = asLegacyRbacRole(role);
+  if (legacyRole) {
     const delQuery = supabaseAdmin.from("user_roles").delete().eq("user_id", id);
     const del = organizationId
       ? await delQuery.eq("organization_id", organizationId)
@@ -161,7 +168,7 @@ adminUsersRoute.patch("/:id/role", async (c) => {
 
     const ins = await supabaseAdmin
       .from("user_roles")
-      .insert({ user_id: id, organization_id: organizationId, role });
+      .insert({ user_id: id, organization_id: organizationId, role: legacyRole });
     if (ins.error) return jsonFail(c, 503, ins.error.message, "UNAVAILABLE");
     syncedToUserRoles = true;
   }
