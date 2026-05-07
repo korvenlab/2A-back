@@ -2,7 +2,7 @@ import { serve } from "@hono/node-server";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { dashboardRoute } from "./dashboard-route.js";
-import { jsonOk } from "./json-response.js";
+import { jsonFail, jsonOk } from "./json-response.js";
 import { metricsRoute } from "./metrics-route.js";
 
 const app = new Hono();
@@ -34,6 +34,13 @@ app.get("/", (c) =>
 
 app.route("/metrics", metricsRoute);
 app.route("/dashboard", dashboardRoute);
+
+app.notFound((c) => jsonFail(c, 404, "Rota não encontrada.", "VALIDATION_ERROR"));
+
+app.onError((err, c) => {
+  console.error("Unhandled API error:", err instanceof Error ? err.message : String(err));
+  return jsonFail(c, 500, "Erro interno.", "INTERNAL_ERROR");
+});
 
 const port = Number(process.env.PORT ?? 8787);
 
