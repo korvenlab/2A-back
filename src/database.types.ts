@@ -74,6 +74,60 @@ export type Database = {
         }
         Relationships: []
       }
+      app_users: {
+        Row: {
+          id: string
+          organization_id: string | null
+          email: string | null
+          name: string | null
+          role: string
+          active: boolean
+          deleted_at: string | null
+          last_sign_in_at: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id: string
+          organization_id?: string | null
+          email?: string | null
+          name?: string | null
+          role?: string
+          active?: boolean
+          deleted_at?: string | null
+          last_sign_in_at?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          organization_id?: string | null
+          email?: string | null
+          name?: string | null
+          role?: string
+          active?: boolean
+          deleted_at?: string | null
+          last_sign_in_at?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "app_users_id_fkey"
+            columns: ["id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "app_users_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       customers: {
         Row: {
           address: string | null
