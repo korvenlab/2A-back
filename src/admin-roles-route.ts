@@ -24,11 +24,11 @@ adminRolesRoute.use("*", async (c, next) => {
 
 adminRolesRoute.get("/", async (c) => {
   const [{ data: roles, error: rolesErr }, { data: permissions, error: permsErr }] = await Promise.all([
-    supabaseAdmin
+    (supabaseAdmin as any)
       .from("app_roles_catalog")
       .select("slug,label,description")
       .order("slug", { ascending: true }),
-    supabaseAdmin
+    (supabaseAdmin as any)
       .from("app_role_permissions")
       .select("role_slug,permission")
       .order("role_slug", { ascending: true }),
@@ -37,8 +37,8 @@ adminRolesRoute.get("/", async (c) => {
   if (rolesErr) return jsonFail(c, 503, rolesErr.message, "UNAVAILABLE");
   if (permsErr) return jsonFail(c, 503, permsErr.message, "UNAVAILABLE");
 
-  const roleRows = (roles ?? []) as RoleRow[];
-  const permRows = (permissions ?? []) as PermissionRow[];
+  const roleRows = ((roles ?? []) as unknown[]) as RoleRow[];
+  const permRows = ((permissions ?? []) as unknown[]) as PermissionRow[];
 
   const permissionsByRole = new Map<string, string[]>();
   for (const p of permRows) {
