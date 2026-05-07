@@ -14,10 +14,11 @@ function emptyMenu() {
   };
 }
 
+/** Catálogo administrativo (/catalogo): somente products:manage (admin/vendedor). Clientes usam apenas portal:view + products via portal. */
 function buildMenu(permissions: Set<string>) {
   return {
     dashboard: permissions.has("dashboard:view"),
-    catalogo: permissions.has("products:view"),
+    catalogo: permissions.has("products:manage"),
     clientes: permissions.has("customers:view"),
     pedidos: permissions.has("orders:view"),
     portal: permissions.has("portal:view"),
