@@ -1,6 +1,8 @@
 import { serve } from "@hono/node-server";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
+import { dashboardRoute } from "./dashboard-route.js";
+import { metricsRoute } from "./metrics-route.js";
 
 const app = new Hono();
 
@@ -15,7 +17,7 @@ app.use(
   cors({
     origin: allowOrigin,
     allowMethods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allowHeaders: ["Content-Type", "Authorization"],
+    allowHeaders: ["Content-Type", "Authorization", "X-API-Key"],
   }),
 );
 
@@ -24,9 +26,12 @@ app.get("/health", (c) => c.json({ ok: true }));
 app.get("/", (c) =>
   c.json({
     service: "2avendas-backend",
-    hint: "API HTTP para integrações futuras. O app web hoje fala com Supabase no browser.",
+    hint: "Dashboard executivo: GET /dashboard | KPIs simples: GET /metrics | Saúde: GET /health",
   }),
 );
+
+app.route("/metrics", metricsRoute);
+app.route("/dashboard", dashboardRoute);
 
 const port = Number(process.env.PORT ?? 8787);
 

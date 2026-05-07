@@ -17,3 +17,5 @@ services:
         sync: false
       - key: SUPABASE_SERVICE_ROLE_KEY
         sync: false
+      - key: METRICS_API_KEY
+        sync: false

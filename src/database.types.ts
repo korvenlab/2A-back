@@ -14,6 +14,66 @@ export type Database = {
   }
   public: {
     Tables: {
+      dashboard_app_logs: {
+        Row: {
+          id: string
+          created_at: string
+          app: string
+          mensagem: string
+          status: string
+        }
+        Insert: {
+          id?: string
+          created_at?: string
+          app: string
+          mensagem: string
+          status: string
+        }
+        Update: {
+          id?: string
+          created_at?: string
+          app?: string
+          mensagem?: string
+          status?: string
+        }
+        Relationships: []
+      }
+      dashboard_daily_app_metrics: {
+        Row: {
+          bucket_date: string
+          app: string
+          revenue: number
+          transactions: number
+        }
+        Insert: {
+          bucket_date: string
+          app: string
+          revenue?: number
+          transactions?: number
+        }
+        Update: {
+          bucket_date?: string
+          app?: string
+          revenue?: number
+          transactions?: number
+        }
+        Relationships: []
+      }
+      dashboard_system_health: {
+        Row: {
+          day: string
+          uptime_pct: number
+        }
+        Insert: {
+          day: string
+          uptime_pct: number
+        }
+        Update: {
+          day?: string
+          uptime_pct?: number
+        }
+        Relationships: []
+      }
       customers: {
         Row: {
           address: string | null
@@ -168,6 +228,53 @@ export type Database = {
           },
           {
             foreignKeyName: "orders_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      assinaturas: {
+        Row: {
+          id: string
+          organization_id: string | null
+          plano: string | null
+          valor_mensal: number
+          status: string
+          produto: string
+          pago: boolean
+          pago_em: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          organization_id?: string | null
+          plano?: string | null
+          valor_mensal?: number
+          status?: string
+          produto?: string
+          pago?: boolean
+          pago_em?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          organization_id?: string | null
+          plano?: string | null
+          valor_mensal?: number
+          status?: string
+          produto?: string
+          pago?: boolean
+          pago_em?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "assinaturas_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
@@ -371,6 +478,18 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      dashboard_full_payload: {
+        Args: {
+          p_organization_id?: string | null
+          p_period_days?: number | null
+          p_chart_days?: number | null
+        }
+        Returns: Json
+      }
+      dashboard_metrics_summary: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
       current_user_org: { Args: never; Returns: string }
       current_user_role: {
         Args: never
