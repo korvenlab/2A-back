@@ -6,6 +6,7 @@ import { adminUsersRoute } from "./admin-users-route.js";
 import { dashboardRoute } from "./dashboard-route.js";
 import { jsonFail, jsonOk } from "./json-response.js";
 import { metricsRoute } from "./metrics-route.js";
+import { sessionRoute } from "./session-route.js";
 
 const app = new Hono();
 
@@ -30,7 +31,7 @@ app.get("/", (c) =>
   jsonOk(c, {
     ok: true,
     service: "2avendas-backend",
-    hint: "Dashboard executivo: GET /dashboard | KPIs simples: GET /metrics | Saúde: GET /health",
+    hint: "Dashboard executivo: GET /dashboard | KPIs: GET /metrics | Menu por permissão: GET /api/session/menu (Bearer Supabase) | Saúde: GET /health",
   }),
 );
 
@@ -38,6 +39,7 @@ app.route("/metrics", metricsRoute);
 app.route("/dashboard", dashboardRoute);
 app.route("/api/admin/roles", adminRolesRoute);
 app.route("/api/admin/users", adminUsersRoute);
+app.route("/api/session", sessionRoute);
 
 app.notFound((c) => jsonFail(c, 404, "Rota não encontrada.", "NOT_FOUND"));
 
