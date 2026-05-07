@@ -1,6 +1,7 @@
 import { serve } from "@hono/node-server";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
+import { adminRolesRoute } from "./admin-roles-route.js";
 import { adminUsersRoute } from "./admin-users-route.js";
 import { dashboardRoute } from "./dashboard-route.js";
 import { jsonFail, jsonOk } from "./json-response.js";
@@ -35,6 +36,7 @@ app.get("/", (c) =>
 
 app.route("/metrics", metricsRoute);
 app.route("/dashboard", dashboardRoute);
+app.route("/api/admin/roles", adminRolesRoute);
 app.route("/api/admin/users", adminUsersRoute);
 
 app.notFound((c) => jsonFail(c, 404, "Rota não encontrada.", "NOT_FOUND"));
