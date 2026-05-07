@@ -5,8 +5,7 @@ import { supabaseAdmin } from "./supabase/admin-client.js";
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const APP_ROLES = ["admin", "vendedor", "cliente"] as const;
-type AppRole = (typeof APP_ROLES)[number];
+const LEGACY_RBAC_ROLES = new Set(["admin", "vendedor", "cliente", "user"]);
 
 interface AppUserRow {
   id: string;
@@ -42,8 +41,9 @@ function parsePagination(
   return { ok: true, page, limit };
 }
 
-function isRole(value: string): value is AppRole {
-  return APP_ROLES.includes(value as AppRole);
+function isRoleValueValid(value: string): boolean {
+  // allow slugs like "admin", "user", "manager", "sales_lead"
+  return /^[a-z][a-z0-9_-]{1,39}$/i.test(value);
 }
 
 export const adminUsersRoute = new Hono();
@@ -124,10 +124,15 @@ adminUsersRoute.patch("/:id/role", async (c) => {
   if (!UUID_RE.test(id)) return jsonFail(c, 400, "id de usuário inválido (UUID).", "VALIDATION_ERROR");
 
   const body = await c.req.json().catch(() => null);
-  const role = (body as { role?: string } | null)?.role?.trim();
+  const role = (body as { role?: string } | null)?.role?.trim().toLowerCase();
   if (!role) return jsonFail(c, 400, "Body inválido: role é obrigatória.", "VALIDATION_ERROR");
-  if (!isRole(role)) {
-    return jsonFail(c, 400, `role inválida. Use: ${APP_ROLES.join(", ")}.`, "VALIDATION_ERROR");
+  if (!isRoleValueValid(role)) {
+    return jsonFail(
+      c,
+      400,
+      "role inválida. Use 2-40 chars, começando por letra, e apenas [a-z0-9_-].",
+      "VALIDATION_ERROR",
+    );
   }
 
   const { data: user, error: uErr } = await supabaseAdmin
@@ -146,18 +151,22 @@ adminUsersRoute.patch("/:id/role", async (c) => {
     .eq("id", id);
   if (up.error) return jsonFail(c, 503, up.error.message, "UNAVAILABLE");
 
-  const delQuery = supabaseAdmin.from("user_roles").delete().eq("user_id", id);
-  const del = organizationId
-    ? await delQuery.eq("organization_id", organizationId)
-    : await delQuery.is("organization_id", null);
-  if (del.error) return jsonFail(c, 503, del.error.message, "UNAVAILABLE");
+  let syncedToUserRoles = false;
+  if (LEGACY_RBAC_ROLES.has(role)) {
+    const delQuery = supabaseAdmin.from("user_roles").delete().eq("user_id", id);
+    const del = organizationId
+      ? await delQuery.eq("organization_id", organizationId)
+      : await delQuery.is("organization_id", null);
+    if (del.error) return jsonFail(c, 503, del.error.message, "UNAVAILABLE");
 
-  const ins = await supabaseAdmin
-    .from("user_roles")
-    .insert({ user_id: id, organization_id: organizationId, role });
-  if (ins.error) return jsonFail(c, 503, ins.error.message, "UNAVAILABLE");
+    const ins = await supabaseAdmin
+      .from("user_roles")
+      .insert({ user_id: id, organization_id: organizationId, role });
+    if (ins.error) return jsonFail(c, 503, ins.error.message, "UNAVAILABLE");
+    syncedToUserRoles = true;
+  }
 
-  return jsonOk(c, { ok: true, data: { id, role } });
+  return jsonOk(c, { ok: true, data: { id, role, syncedToUserRoles } });
 });
 
 adminUsersRoute.patch("/:id/status", async (c) => {
