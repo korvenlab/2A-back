@@ -198,7 +198,8 @@ adminUsersRoute.patch("/:id/role", async (c) => {
   if (!profile) return jsonFail(c, 404, "Usuário não encontrado.", "NOT_FOUND");
 
   const organizationId = (profile as { organization_id: string | null }).organization_id ?? null;
-  const del = await supabaseAdmin.from("user_roles").delete().eq("user_id", id).eq("organization_id", organizationId);
+  const delQuery = supabaseAdmin.from("user_roles").delete().eq("user_id", id);
+  const del = organizationId ? await delQuery.eq("organization_id", organizationId) : await delQuery.is("organization_id", null);
   if (del.error) return jsonFail(c, 503, del.error.message, "UNAVAILABLE");
 
   const ins = await supabaseAdmin
