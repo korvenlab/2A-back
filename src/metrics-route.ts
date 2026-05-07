@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { metricsApiKeyUnauthorizedResponse } from "./api-key-auth.js";
+import { jsonFail, jsonOk } from "./json-response.js";
 import { supabaseAdmin } from "./supabase/admin-client.js";
 
 export const metricsRoute = new Hono();
@@ -12,14 +13,7 @@ metricsRoute.get("/", async (c) => {
     const { data, error } = await supabaseAdmin.rpc("dashboard_metrics_summary");
 
     if (error) {
-      return c.json(
-        {
-          ok: false,
-          error: error.message,
-          code: "INTERNAL_ERROR",
-        },
-        502,
-      );
+      return jsonFail(c, 502, error.message, "UNAVAILABLE");
     }
 
     const raw = data as {
@@ -40,7 +34,7 @@ metricsRoute.get("/", async (c) => {
 
     const int = (v: number | string | undefined) => Math.trunc(num(v));
 
-    return c.json({
+    return jsonOk(c, {
       ok: true,
       gerado_em: raw?.gerado_em ?? null,
       assinaturas: {
@@ -58,6 +52,6 @@ metricsRoute.get("/", async (c) => {
     });
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
-    return c.json({ ok: false, error: message, code: "INTERNAL_ERROR" }, 503);
+    return jsonFail(c, 503, message, "INTERNAL_ERROR");
   }
 });

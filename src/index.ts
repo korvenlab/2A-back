@@ -2,6 +2,7 @@ import { serve } from "@hono/node-server";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { dashboardRoute } from "./dashboard-route.js";
+import { jsonOk } from "./json-response.js";
 import { metricsRoute } from "./metrics-route.js";
 
 const app = new Hono();
@@ -17,14 +18,15 @@ app.use(
   cors({
     origin: allowOrigin,
     allowMethods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allowHeaders: ["Content-Type", "Authorization", "X-API-Key"],
+    allowHeaders: ["Content-Type", "Authorization", "X-API-Key", "x-admin-secret"],
   }),
 );
 
-app.get("/health", (c) => c.json({ ok: true }));
+app.get("/health", (c) => jsonOk(c, { ok: true }));
 
 app.get("/", (c) =>
-  c.json({
+  jsonOk(c, {
+    ok: true,
     service: "2avendas-backend",
     hint: "Dashboard executivo: GET /dashboard | KPIs simples: GET /metrics | Saúde: GET /health",
   }),
