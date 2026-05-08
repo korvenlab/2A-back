@@ -5,8 +5,8 @@ import { supabaseAdmin } from "./supabase/admin-client.js";
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const LEGACY_RBAC_ROLES = new Set(["admin", "vendedor", "cliente", "user"]);
-type LegacyRbacRole = "admin" | "vendedor" | "cliente" | "user";
+const LEGACY_RBAC_ROLES = new Set(["admin", "vendedor", "cliente"]);
+type LegacyRbacRole = "admin" | "vendedor" | "cliente";
 
 interface AppUserRow {
   id: string;
@@ -43,8 +43,7 @@ function parsePagination(
 }
 
 function isRoleValueValid(value: string): boolean {
-  // allow slugs like "admin", "user", "manager", "sales_lead"
-  return /^[a-z][a-z0-9_-]{1,39}$/i.test(value);
+  return LEGACY_RBAC_ROLES.has(value);
 }
 
 function asLegacyRbacRole(value: string): LegacyRbacRole | null {
@@ -136,7 +135,7 @@ adminUsersRoute.patch("/:id/role", async (c) => {
     return jsonFail(
       c,
       400,
-      "role inválida. Use 2-40 chars, começando por letra, e apenas [a-z0-9_-].",
+      "role inválida. Use apenas: admin, vendedor ou cliente.",
       "VALIDATION_ERROR",
     );
   }
@@ -160,10 +159,8 @@ adminUsersRoute.patch("/:id/role", async (c) => {
   let syncedToUserRoles = false;
   const legacyRole = asLegacyRbacRole(role);
   if (legacyRole) {
-    const delQuery = supabaseAdmin.from("user_roles").delete().eq("user_id", id);
-    const del = organizationId
-      ? await delQuery.eq("organization_id", organizationId)
-      : await delQuery.is("organization_id", null);
+    // Keep a single authoritative role per user across app contexts.
+    const del = await supabaseAdmin.from("user_roles").delete().eq("user_id", id);
     if (del.error) return jsonFail(c, 503, del.error.message, "UNAVAILABLE");
 
     const ins = await supabaseAdmin

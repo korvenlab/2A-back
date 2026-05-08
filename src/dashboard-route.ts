@@ -61,6 +61,22 @@ function daySeries(days: number): string[] {
   return out;
 }
 
+async function countCustomerSignups(
+  organizationId: string | null,
+  startIso: string,
+  endIso: string,
+): Promise<number> {
+  const base = supabaseAdmin
+    .from("customers")
+    .select("id", { count: "exact", head: true })
+    .gte("created_at", startIso)
+    .lt("created_at", endIso);
+  const scoped = organizationId ? base.eq("organization_id", organizationId) : base;
+  const { count, error } = await scoped;
+  if (error) return 0;
+  return count ?? 0;
+}
+
 async function buildDashboardFallback(organizationId: string | null, periodDays: number, chartDays: number) {
   const now = new Date();
   const curStart = new Date(now);
@@ -103,6 +119,9 @@ async function buildDashboardFallback(organizationId: string | null, periodDays:
 
   const revDelta = prevRevenue > 0 ? ((curRevenue - prevRevenue) / prevRevenue) * 100 : null;
   const volDelta = prevVol > 0 ? ((curVol - prevVol) / prevVol) * 100 : null;
+  const signupCur = await countCustomerSignups(organizationId, curStart.toISOString(), now.toISOString());
+  const signupPrev = await countCustomerSignups(organizationId, prevStart.toISOString(), curStart.toISOString());
+  const signupDelta = signupPrev > 0 ? ((signupCur - signupPrev) / signupPrev) * 100 : null;
 
   const volumeMap = new Map<string, number>();
   for (const row of curOrders) {
@@ -173,8 +192,10 @@ async function buildDashboardFallback(organizationId: string | null, periodDays:
     kpis: {
       receita_total: { valor: curRevenue, delta_pct: revDelta },
       assinaturas_ativas_wagoo: { valor: assinAtivas, delta_pct: null },
+      usuarios_ativos_wagoo: { valor: assinAtivas, delta_pct: null },
       volume_vendas_2avendas: { valor: curVol, delta_pct: volDelta },
-      uptime_medio: { valor: 99.92, delta_pct: null },
+      cadastros_clientes_2avendas: { valor: signupCur, delta_pct: signupDelta },
+      uptime_medio: { valor: null, delta_pct: null },
     },
     waggo: { receita_por_dia: waggoRevenueSeries },
     dois_avendas: { volume_por_dia: volumeSeries },
@@ -238,6 +259,12 @@ dashboardRoute.get("/", async (c) => {
     const sidebarItens = Array.isArray(ui.sidebar_itens) ? ui.sidebar_itens : [];
 
     const filtroSrc = (payload.filtros as Record<string, unknown>) ?? {};
+    const currentWindowStartIso = new Date(Date.now() - periodDays * 24 * 60 * 60 * 1000).toISOString();
+    const nowIso = new Date().toISOString();
+    const previousWindowStartIso = new Date(Date.now() - periodDays * 2 * 24 * 60 * 60 * 1000).toISOString();
+    const signupCur = await countCustomerSignups(organizationId, currentWindowStartIso, nowIso);
+    const signupPrev = await countCustomerSignups(organizationId, previousWindowStartIso, currentWindowStartIso);
+    const signupDelta = signupPrev > 0 ? ((signupCur - signupPrev) / signupPrev) * 100 : null;
 
     const volumePorDiaRaw = Array.isArray(doisAvendas.volume_por_dia) ? doisAvendas.volume_por_dia : [];
     const volumePorDia = volumePorDiaRaw.map((item) => {
@@ -299,12 +326,20 @@ dashboardRoute.get("/", async (c) => {
           valor: asNumber(kpiAssinWagoo.valor),
           delta_pct: asNullableNumber(kpiAssinWagoo.variacao_pct ?? kpiAssinWagoo.delta_pct),
         },
+        usuarios_ativos_wagoo: {
+          valor: asNumber(kpiAssinWagoo.valor),
+          delta_pct: asNullableNumber(kpiAssinWagoo.variacao_pct ?? kpiAssinWagoo.delta_pct),
+        },
         volume_vendas_2avendas: {
           valor: asNumber(kpiVolume.valor),
           delta_pct: asNullableNumber(kpiVolume.variacao_pct ?? kpiVolume.delta_pct),
         },
+        cadastros_clientes_2avendas: {
+          valor: signupCur,
+          delta_pct: signupDelta,
+        },
         uptime_medio: {
-          valor: asNumber(kpiUptime.valor_pct ?? kpiUptime.valor),
+          valor: asNullableNumber(kpiUptime.valor_pct ?? kpiUptime.valor),
           delta_pct: asNullableNumber(kpiUptime.variacao_pct ?? kpiUptime.delta_pct),
         },
       },

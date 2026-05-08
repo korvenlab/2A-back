@@ -14,6 +14,8 @@ interface PermissionRow {
   permission: string;
 }
 
+const ALLOWED_ROLES = new Set(["admin", "vendedor", "cliente"]);
+
 export const adminRolesRoute = new Hono();
 
 adminRolesRoute.use("*", async (c, next) => {
@@ -47,12 +49,14 @@ adminRolesRoute.get("/", async (c) => {
     permissionsByRole.set(p.role_slug, list);
   }
 
-  const items = roleRows.map((r) => ({
-    slug: r.slug,
-    label: r.label,
-    description: r.description,
-    permissions: permissionsByRole.get(r.slug) ?? [],
-  }));
+  const items = roleRows
+    .filter((r) => ALLOWED_ROLES.has(r.slug))
+    .map((r) => ({
+      slug: r.slug,
+      label: r.label,
+      description: r.description,
+      permissions: permissionsByRole.get(r.slug) ?? [],
+    }));
 
   return jsonOk(c, { ok: true, data: { items, total: items.length } });
 });
