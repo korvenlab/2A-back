@@ -1,5 +1,6 @@
 node_modules
 dist
+.tools
 supabase/.temp
 *.local
 .env
