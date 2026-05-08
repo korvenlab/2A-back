@@ -149,26 +149,18 @@ adminUsersRoute.patch("/:id/role", async (c) => {
   if (uErr) return jsonFail(c, 503, uErr.message, "UNAVAILABLE");
   if (!user) return jsonFail(c, 404, "Usuário não encontrado.", "NOT_FOUND");
 
-  const organizationId = (user as { organization_id: string | null }).organization_id ?? null;
   const up = await supabaseAdmin
     .from("app_users")
     .update({ role, updated_at: new Date().toISOString() })
     .eq("id", id);
   if (up.error) return jsonFail(c, 503, up.error.message, "UNAVAILABLE");
 
-  let syncedToUserRoles = false;
+  /**
+   * Espelha profile.organization_id + user_roles via trigger no banco
+   * (`trg_reconcile_app_user_identity`). Korven e o app 2AVendas ficam alinhados sem duplicar lógica aqui.
+   */
   const legacyRole = asLegacyRbacRole(role);
-  if (legacyRole) {
-    // Keep a single authoritative role per user across app contexts.
-    const del = await supabaseAdmin.from("user_roles").delete().eq("user_id", id);
-    if (del.error) return jsonFail(c, 503, del.error.message, "UNAVAILABLE");
-
-    const ins = await supabaseAdmin
-      .from("user_roles")
-      .insert({ user_id: id, organization_id: organizationId, role: legacyRole });
-    if (ins.error) return jsonFail(c, 503, ins.error.message, "UNAVAILABLE");
-    syncedToUserRoles = true;
-  }
+  const syncedToUserRoles = legacyRole !== null;
 
   return jsonOk(c, { ok: true, data: { id, role, syncedToUserRoles } });
 });
