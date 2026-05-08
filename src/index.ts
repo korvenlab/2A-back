@@ -38,7 +38,7 @@ app.get("/", (c) =>
   jsonOk(c, {
     ok: true,
     service: "2avendas-backend",
-    hint: "Dashboard executivo: GET /dashboard | KPIs: GET /metrics | Feedback: GET /feedback/messages (API key) | Menu: GET /api/session/menu (Bearer) | Saúde: GET /health",
+    hint: "Dashboard executivo: GET /dashboard | KPIs: GET /metrics | Feedback: GET/DELETE /feedback/messages (API key) | Menu: GET /api/session/menu (Bearer) | Saúde: GET /health",
   }),
 );
 

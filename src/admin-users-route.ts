@@ -175,7 +175,8 @@ adminUsersRoute.patch("/:id/status", async (c) => {
     return jsonFail(c, 400, "Body inválido: active (boolean) é obrigatório.", "VALIDATION_ERROR");
   }
 
-  const patch = active ? { active: true, deleted_at: null } : { active: false, deleted_at: new Date().toISOString() };
+  /** Desativar só corta acesso (`active`); não marca `deleted_at`. Reativar limpa `deleted_at` legado. */
+  const patch = active ? { active: true, deleted_at: null } : { active: false };
   const { data, error } = await supabaseAdmin
     .from("app_users")
     .update(patch)
@@ -195,18 +196,20 @@ adminUsersRoute.delete("/:id", async (c) => {
   const id = c.req.param("id");
   if (!UUID_RE.test(id)) return jsonFail(c, 400, "id de usuário inválido (UUID).", "VALIDATION_ERROR");
 
-  const { data, error } = await supabaseAdmin
+  const { data: row, error: findErr } = await supabaseAdmin
     .from("app_users")
-    .update({ active: false, deleted_at: new Date().toISOString() })
+    .select("id")
     .eq("id", id)
-    .select("id,active,deleted_at")
     .maybeSingle();
-  if (error) return jsonFail(c, 503, error.message, "UNAVAILABLE");
-  if (!data) return jsonFail(c, 404, "Usuário não encontrado.", "NOT_FOUND");
+  if (findErr) return jsonFail(c, 503, findErr.message, "UNAVAILABLE");
+  if (!row) return jsonFail(c, 404, "Usuário não encontrado.", "NOT_FOUND");
+
+  const { error: authErr } = await supabaseAdmin.auth.admin.deleteUser(id);
+  if (authErr) return jsonFail(c, 503, authErr.message, "UNAVAILABLE");
 
   return jsonOk(c, {
     ok: true,
-    data: { id: (data as { id: string }).id, deleted: true },
+    data: { id, deleted: true },
   });
 });
 
