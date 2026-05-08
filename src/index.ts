@@ -25,7 +25,13 @@ app.use(
   }),
 );
 
-app.get("/health", (c) => jsonOk(c, { ok: true }));
+const getHealthPayload = () => ({
+  ok: true,
+  service: "2avendas-backend",
+  timestamp: new Date().toISOString(),
+});
+
+app.get("/health", (c) => jsonOk(c, getHealthPayload()));
 
 app.get("/", (c) =>
   jsonOk(c, {
