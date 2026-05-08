@@ -15,14 +15,17 @@ function emptyMenu() {
 }
 
 /** Catálogo administrativo (/catalogo): somente products:manage (admin/vendedor). Clientes usam apenas portal:view + products via portal. */
-function buildMenu(permissions: Set<string>) {
+function buildMenu(permissions: Set<string>, roleSlug: string | null) {
+  const slug = roleSlug?.trim().toLowerCase() ?? "";
+  const isAdmin = slug === "admin";
   return {
     dashboard: permissions.has("dashboard:view"),
     catalogo: permissions.has("products:manage"),
     clientes: permissions.has("customers:view"),
     pedidos: permissions.has("orders:view"),
     portal: permissions.has("portal:view"),
-    vendedores: permissions.has("sellers:view"),
+    /** Admin sempre gerencia convites de vendedores e links; permissão sellers:view cobre matrizes customizadas. */
+    vendedores: isAdmin || permissions.has("sellers:view"),
   };
 }
 
@@ -122,7 +125,7 @@ sessionRoute.get("/menu", async (c) => {
 
   const permissionRows = (permData ?? []) as PermRow[];
   const permissions = permissionRows.map((r) => r.permission);
-  const menu = buildMenu(new Set(permissions));
+  const menu = buildMenu(new Set(permissions), roleSlug);
 
   return jsonOk(c, {
     ok: true,

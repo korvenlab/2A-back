@@ -187,6 +187,44 @@ export type Database = {
           },
         ]
       }
+      feedback_messages: {
+        Row: {
+          body: string
+          created_at: string
+          id: string
+          organization_id: string | null
+          user_email: string | null
+          user_full_name: string | null
+          user_id: string
+        }
+        Insert: {
+          body: string
+          created_at?: string
+          id?: string
+          organization_id?: string | null
+          user_email?: string | null
+          user_full_name?: string | null
+          user_id: string
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          id?: string
+          organization_id?: string | null
+          user_email?: string | null
+          user_full_name?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "feedback_messages_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       order_items: {
         Row: {
           created_at: string
@@ -368,6 +406,7 @@ export type Database = {
           description: string | null
           id: string
           image_url: string | null
+          image_urls: Json
           name: string
           organization_id: string
           price: number
@@ -383,6 +422,7 @@ export type Database = {
           description?: string | null
           id?: string
           image_url?: string | null
+          image_urls?: Json
           name: string
           organization_id: string
           price?: number
@@ -398,6 +438,7 @@ export type Database = {
           description?: string | null
           id?: string
           image_url?: string | null
+          image_urls?: Json
           name?: string
           organization_id?: string
           price?: number

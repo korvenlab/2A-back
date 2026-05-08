@@ -7,6 +7,7 @@ import { dashboardRoute } from "./dashboard-route.js";
 import { jsonFail, jsonOk } from "./json-response.js";
 import { metricsRoute } from "./metrics-route.js";
 import { sessionRoute } from "./session-route.js";
+import { feedbackRoute } from "./feedback-route.js";
 
 const app = new Hono();
 
@@ -37,11 +38,12 @@ app.get("/", (c) =>
   jsonOk(c, {
     ok: true,
     service: "2avendas-backend",
-    hint: "Dashboard executivo: GET /dashboard | KPIs: GET /metrics | Menu por permissão: GET /api/session/menu (Bearer Supabase) | Saúde: GET /health",
+    hint: "Dashboard executivo: GET /dashboard | KPIs: GET /metrics | Feedback: GET /feedback/messages (API key) | Menu: GET /api/session/menu (Bearer) | Saúde: GET /health",
   }),
 );
 
 app.route("/metrics", metricsRoute);
+app.route("/feedback", feedbackRoute);
 app.route("/dashboard", dashboardRoute);
 app.route("/api/admin/roles", adminRolesRoute);
 app.route("/api/admin/users", adminUsersRoute);
