@@ -1,6 +1,7 @@
 import { serve } from "@hono/node-server";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
+import { secureHeaders } from "hono/secure-headers";
 import { adminRolesRoute } from "./admin-roles-route.js";
 import { adminUsersRoute } from "./admin-users-route.js";
 import { dashboardRoute } from "./dashboard-route.js";
@@ -10,6 +11,22 @@ import { sessionRoute } from "./session-route.js";
 import { feedbackRoute } from "./feedback-route.js";
 
 const app = new Hono();
+
+app.use(
+  "*",
+  secureHeaders({
+    xFrameOptions: "DENY",
+    xContentTypeOptions: "nosniff",
+    referrerPolicy: "strict-origin-when-cross-origin",
+    permissionsPolicy: {
+      camera: ["none"],
+      microphone: ["none"],
+      geolocation: ["none"],
+      payment: ["none"],
+      usb: ["none"],
+    },
+  }),
+);
 
 const rawOrigins = process.env.FRONTEND_ORIGIN?.trim();
 const allowOrigin =
