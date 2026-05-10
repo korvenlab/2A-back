@@ -137,6 +137,8 @@ export type Database = {
           document: string | null
           email: string | null
           id: string
+          industry: string | null
+          legal_name: string | null
           name: string
           notes: string | null
           organization_id: string
@@ -153,6 +155,8 @@ export type Database = {
           document?: string | null
           email?: string | null
           id?: string
+          industry?: string | null
+          legal_name?: string | null
           name: string
           notes?: string | null
           organization_id: string
@@ -169,6 +173,8 @@ export type Database = {
           document?: string | null
           email?: string | null
           id?: string
+          industry?: string | null
+          legal_name?: string | null
           name?: string
           notes?: string | null
           organization_id?: string
@@ -180,6 +186,63 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "customers_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      commercial_visits: {
+        Row: {
+          address: string | null
+          created_at: string
+          customer_id: string | null
+          duration_minutes: number
+          id: string
+          notes: string | null
+          organization_id: string
+          scheduled_at: string
+          seller_id: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          address?: string | null
+          created_at?: string
+          customer_id?: string | null
+          duration_minutes?: number
+          id?: string
+          notes?: string | null
+          organization_id: string
+          scheduled_at: string
+          seller_id?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          address?: string | null
+          created_at?: string
+          customer_id?: string | null
+          duration_minutes?: number
+          id?: string
+          notes?: string | null
+          organization_id?: string
+          scheduled_at?: string
+          seller_id?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "commercial_visits_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "commercial_visits_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
@@ -233,6 +296,7 @@ export type Database = {
           product_id: string
           product_name: string
           quantity: number
+          stock_applied: boolean
           subtotal: number
           unit_price: number
         }
@@ -243,6 +307,7 @@ export type Database = {
           product_id: string
           product_name: string
           quantity?: number
+          stock_applied?: boolean
           subtotal?: number
           unit_price?: number
         }
@@ -253,6 +318,7 @@ export type Database = {
           product_id?: string
           product_name?: string
           quantity?: number
+          stock_applied?: boolean
           subtotal?: number
           unit_price?: number
         }
@@ -278,6 +344,8 @@ export type Database = {
           created_at: string
           customer_id: string
           id: string
+          nfe_issued_at: string | null
+          nfe_key: string | null
           notes: string | null
           order_number: number
           organization_id: string
@@ -290,6 +358,8 @@ export type Database = {
           created_at?: string
           customer_id: string
           id?: string
+          nfe_issued_at?: string | null
+          nfe_key?: string | null
           notes?: string | null
           order_number: number
           organization_id: string
@@ -302,6 +372,8 @@ export type Database = {
           created_at?: string
           customer_id?: string
           id?: string
+          nfe_issued_at?: string | null
+          nfe_key?: string | null
           notes?: string | null
           order_number?: number
           organization_id?: string

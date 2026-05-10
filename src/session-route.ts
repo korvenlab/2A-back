@@ -9,6 +9,9 @@ function emptyMenu() {
     catalogo: false,
     clientes: false,
     pedidos: false,
+    orcamentos: false,
+    funil: false,
+    visitas: false,
     portal: false,
     vendedores: false,
   };
@@ -23,6 +26,12 @@ function buildMenu(permissions: Set<string>, roleSlug: string | null) {
     catalogo: permissions.has("products:manage"),
     clientes: permissions.has("customers:view"),
     pedidos: permissions.has("orders:view"),
+    /** Mesmo público de pedidos (admin / vendedor com orders:view). */
+    orcamentos: permissions.has("orders:view"),
+    /** CRM / funil — quem vê clientes gerencia oportunidades. */
+    funil: permissions.has("customers:view"),
+    /** Agenda de visitas — mesmo público do CRM. */
+    visitas: permissions.has("customers:view"),
     portal: permissions.has("portal:view"),
     /** Admin sempre gerencia convites de vendedores e links; permissão sellers:view cobre matrizes customizadas. */
     vendedores: isAdmin || permissions.has("sellers:view"),
