@@ -2,6 +2,31 @@ import { Hono } from "hono";
 import { jsonFail, jsonOk } from "./json-response.js";
 import { supabaseAdmin } from "./supabase/admin-client.js";
 
+const ROLE_PRIORITY = ["admin", "vendedor", "cliente"] as const;
+
+function roleRank(slug: string | null | undefined): number {
+  const s = slug?.trim().toLowerCase() ?? "";
+  const i = ROLE_PRIORITY.indexOf(s as (typeof ROLE_PRIORITY)[number]);
+  return i === -1 ? 999 : i;
+}
+
+/** Mescla candidatos de app_users e user_roles — admin vence vendedor/cliente mesmo se app_users estiver defasado. */
+function strongestRoleSlug(...candidates: (string | null | undefined)[]): string | null {
+  let best: string | null = null;
+  let bestR = 999;
+  for (const c of candidates) {
+    const s = c?.trim().toLowerCase() ?? "";
+    if (!s) continue;
+    const r = roleRank(s);
+    if (r >= 999) continue;
+    if (r < bestR) {
+      bestR = r;
+      best = s;
+    }
+  }
+  return best;
+}
+
 /** Mapa estável para o frontend esconder itens de navegação (evita páginas que disparam erro de permissão Supabase). */
 function emptyMenu() {
   return {
@@ -92,34 +117,42 @@ sessionRoute.get("/menu", async (c) => {
   }
 
   if (au && au.active !== false) {
-    roleSlug = au.role?.trim().toLowerCase() || null;
     organizationId = au.organization_id ?? null;
   }
 
+  const { data: urRows, error: urErr } = await supabaseAdmin
+    .from("user_roles")
+    .select("role, organization_id")
+    .eq("user_id", userId);
+
+  if (urErr) return jsonFail(c, 503, urErr.message, "UNAVAILABLE");
+
+  type Ur = { role: string | null; organization_id: string | null };
+  const urList = (urRows ?? []) as Ur[];
+
+  roleSlug = strongestRoleSlug(
+    au?.role,
+    ...urList.map((r) => r.role),
+  );
+
   if (!roleSlug) {
-    const { data: urRow, error: urErr } = await supabaseAdmin
-      .from("user_roles")
-      .select("role, organization_id")
-      .eq("user_id", userId)
-      .maybeSingle();
+    return jsonOk(c, {
+      ok: true,
+      data: {
+        user_id: userId,
+        organization_id: organizationId,
+        role: null as string | null,
+        permissions: [] as string[],
+        menu: emptyMenu(),
+      },
+    });
+  }
 
-    if (urErr) return jsonFail(c, 503, urErr.message, "UNAVAILABLE");
-
-    if (!urRow?.role) {
-      return jsonOk(c, {
-        ok: true,
-        data: {
-          user_id: userId,
-          organization_id: organizationId,
-          role: null as string | null,
-          permissions: [] as string[],
-          menu: emptyMenu(),
-        },
-      });
-    }
-
-    roleSlug = String(urRow.role).trim().toLowerCase();
-    if (!organizationId) organizationId = urRow.organization_id ?? null;
+  if (!organizationId) {
+    const matchOrg = urList.find(
+      (r) => String(r.role ?? "").trim().toLowerCase() === roleSlug,
+    );
+    organizationId = matchOrg?.organization_id ?? urList[0]?.organization_id ?? null;
   }
 
   type PermRow = { permission: string };
