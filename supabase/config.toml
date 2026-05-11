@@ -1,1 +1,10 @@
+# Projeto linkado (ref). Auth/API: defaults do CLI onde omitido.
 project_id = "otunngvmzzmnfwwbabgp"
+
+# [auth.email]
+# - enable_signup = true  → permite signUp por e-mail (senão: "Email signups are disabled").
+# - enable_confirmations = false → entra sem link de confirmação no e-mail.
+# Projeto hospedado: `supabase config push` ou o mesmo em Authentication → Providers → Email.
+[auth.email]
+enable_signup = true
+enable_confirmations = false
