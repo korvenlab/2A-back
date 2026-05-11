@@ -675,6 +675,10 @@ export type Database = {
         }
         Returns: boolean
       }
+      organization_primary_admin_user_id: {
+        Args: { p_organization_id: string }
+        Returns: string | null
+      }
     }
     Enums: {
       app_role: "admin" | "vendedor" | "cliente" | "user"
