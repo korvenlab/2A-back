@@ -448,23 +448,29 @@ export type Database = {
       }
       organizations: {
         Row: {
+          admin_commission_share_pct: number
           created_at: string
           id: string
           name: string
+          owner_user_id: string | null
           slug: string
           updated_at: string
         }
         Insert: {
+          admin_commission_share_pct?: number
           created_at?: string
           id?: string
           name: string
+          owner_user_id?: string | null
           slug: string
           updated_at?: string
         }
         Update: {
+          admin_commission_share_pct?: number
           created_at?: string
           id?: string
           name?: string
+          owner_user_id?: string | null
           slug?: string
           updated_at?: string
         }
