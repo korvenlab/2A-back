@@ -6,6 +6,9 @@ export const JSON_CONTENT_TYPE = "application/json; charset=utf-8";
 export type KorvenErrorCode =
   | "UNAUTHORIZED"
   | "VALIDATION_ERROR"
+  | "BAD_REQUEST"
+  | "FORBIDDEN"
+  | "CONFLICT"
   | "INTERNAL_ERROR"
   | "UNAVAILABLE"
   | "NOT_FOUND";

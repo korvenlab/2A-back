@@ -449,29 +449,41 @@ export type Database = {
       organizations: {
         Row: {
           admin_commission_share_pct: number
+          billing_manual_unlock: boolean
+          billing_stripe_active: boolean
           created_at: string
           id: string
           name: string
           owner_user_id: string | null
           slug: string
+          stripe_customer_id: string | null
+          stripe_subscription_id: string | null
           updated_at: string
         }
         Insert: {
           admin_commission_share_pct?: number
+          billing_manual_unlock?: boolean
+          billing_stripe_active?: boolean
           created_at?: string
           id?: string
           name: string
           owner_user_id?: string | null
           slug: string
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
           updated_at?: string
         }
         Update: {
           admin_commission_share_pct?: number
+          billing_manual_unlock?: boolean
+          billing_stripe_active?: boolean
           created_at?: string
           id?: string
           name?: string
           owner_user_id?: string | null
           slug?: string
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
           updated_at?: string
         }
         Relationships: []

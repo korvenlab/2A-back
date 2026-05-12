@@ -9,6 +9,7 @@ import { jsonFail, jsonOk } from "./json-response.js";
 import { metricsRoute } from "./metrics-route.js";
 import { sessionRoute } from "./session-route.js";
 import { feedbackRoute } from "./feedback-route.js";
+import { billingRoute } from "./billing-route.js";
 
 const app = new Hono();
 
@@ -39,7 +40,14 @@ app.use(
   cors({
     origin: allowOrigin,
     allowMethods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allowHeaders: ["Content-Type", "Authorization", "X-API-Key", "x-admin-secret"],
+    allowHeaders: [
+      "Content-Type",
+      "Authorization",
+      "X-API-Key",
+      "x-admin-secret",
+      "X-Billing-Admin-Secret",
+      "Stripe-Signature",
+    ],
   }),
 );
 
@@ -55,7 +63,7 @@ app.get("/", (c) =>
   jsonOk(c, {
     ok: true,
     service: "2avendas-backend",
-    hint: "Dashboard executivo: GET /dashboard | KPIs: GET /metrics | Feedback: GET/DELETE /feedback/messages (API key) | Menu: GET /api/session/menu (Bearer) | Saúde: GET /health",
+    hint: "Dashboard executivo: GET /dashboard | KPIs: GET /metrics | Feedback: GET/DELETE /feedback/messages (API key) | Menu: GET /api/session/menu (Bearer) | Billing: checkout POST /api/billing/checkout-session (Bearer admin), webhook POST /api/billing/webhook (Stripe), Korven link POST /api/billing/organization-access-link (X-Billing-Admin-Secret), claim POST /api/billing/claim-unlock | Saúde: GET /health",
   }),
 );
 
@@ -65,6 +73,7 @@ app.route("/dashboard", dashboardRoute);
 app.route("/api/admin/roles", adminRolesRoute);
 app.route("/api/admin/users", adminUsersRoute);
 app.route("/api/session", sessionRoute);
+app.route("/api/billing", billingRoute);
 
 app.notFound((c) => jsonFail(c, 404, "Rota não encontrada.", "NOT_FOUND"));
 
