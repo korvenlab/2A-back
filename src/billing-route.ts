@@ -24,6 +24,13 @@ function checkoutOrigin(): string {
   return first?.replace(/\/+$/, "") || "http://localhost:5173";
 }
 
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function isUuid(s: string): boolean {
+  return UUID_RE.test(s.trim());
+}
+
 export const billingRoute = new Hono();
 
 /**
@@ -264,14 +271,23 @@ billingRoute.post("/webhook", async (c) => {
 
   try {
     switch (event.type) {
-      case "checkout.session.completed": {
+      case "checkout.session.completed":
+      case "checkout.session.async_payment_succeeded": {
         const session = event.data.object as Stripe.Checkout.Session;
-        const orgId = session.metadata?.organization_id ?? session.client_reference_id ?? undefined;
+        const rawOrg =
+          typeof session.metadata?.organization_id === "string"
+            ? session.metadata.organization_id
+            : typeof session.client_reference_id === "string"
+              ? session.client_reference_id
+              : undefined;
+        const orgId = rawOrg?.trim();
+        if (!orgId || !isUuid(orgId)) break;
+
         const customerId =
           typeof session.customer === "string"
             ? session.customer
-            : session.customer && "id" in session.customer
-              ? session.customer.id
+            : session.customer && typeof session.customer === "object" && "id" in session.customer
+              ? (session.customer as { id: string }).id
               : null;
         const subId =
           typeof session.subscription === "string"
@@ -279,16 +295,16 @@ billingRoute.post("/webhook", async (c) => {
             : session.subscription && typeof session.subscription === "object" && "id" in session.subscription
               ? (session.subscription as Stripe.Subscription).id
               : null;
-        if (orgId && customerId) {
-          await supabaseAdmin
-            .from("organizations")
-            .update({
-              stripe_customer_id: customerId,
-              stripe_subscription_id: subId,
-              billing_stripe_active: true,
-            })
-            .eq("id", orgId);
-        }
+
+        const patch: {
+          billing_stripe_active: boolean;
+          stripe_customer_id?: string;
+          stripe_subscription_id?: string | null;
+        } = { billing_stripe_active: true };
+        if (customerId) patch.stripe_customer_id = customerId;
+        if (subId !== null && subId !== undefined) patch.stripe_subscription_id = subId;
+
+        await supabaseAdmin.from("organizations").update(patch).eq("id", orgId);
         break;
       }
       case "customer.subscription.updated": {
