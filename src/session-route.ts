@@ -86,6 +86,7 @@ sessionRoute.get("/menu", async (c) => {
           satisfied: true,
           stripe_active: false,
           manual_unlock: false,
+          user_stripe_paid: false,
         },
       },
     });
@@ -108,6 +109,7 @@ sessionRoute.get("/menu", async (c) => {
           satisfied: true,
           stripe_active: false,
           manual_unlock: false,
+          user_stripe_paid: false,
         },
       },
     });
@@ -129,6 +131,7 @@ sessionRoute.get("/menu", async (c) => {
 
   let billingStripe = false;
   let billingManual = false;
+  let userStripePaid = false;
   if (staffNeedsBilling(roleSlug) && organizationId) {
     const { data: orgRow, error: orgErr } = await supabaseAdmin
       .from("organizations")
@@ -142,7 +145,17 @@ sessionRoute.get("/menu", async (c) => {
     } | null;
     billingStripe = !!row?.billing_stripe_active;
     billingManual = !!row?.billing_manual_unlock;
-    const satisfied = billingStripe || billingManual;
+
+    const { data: auRow, error: auErr } = await supabaseAdmin
+      .from("app_users")
+      .select("billing_stripe_access_at")
+      .eq("id", userId)
+      .eq("organization_id", organizationId)
+      .maybeSingle();
+    if (auErr) return jsonFail(c, 503, auErr.message, "UNAVAILABLE");
+    userStripePaid = !!(auRow as { billing_stripe_access_at?: string | null } | null)?.billing_stripe_access_at;
+
+    const satisfied = billingStripe || billingManual || userStripePaid;
     if (!satisfied) {
       menu = emptyMenu();
     }
@@ -150,7 +163,7 @@ sessionRoute.get("/menu", async (c) => {
 
   const billingRequired = staffNeedsBilling(roleSlug) && !!organizationId;
   const billingSatisfied =
-    !billingRequired || billingStripe || billingManual;
+    !billingRequired || billingStripe || billingManual || userStripePaid;
 
   return jsonOk(c, {
     ok: true,
@@ -165,6 +178,7 @@ sessionRoute.get("/menu", async (c) => {
         satisfied: billingSatisfied,
         stripe_active: billingStripe,
         manual_unlock: billingManual,
+        user_stripe_paid: userStripePaid,
       },
     },
   });

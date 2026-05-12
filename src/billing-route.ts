@@ -209,6 +209,18 @@ billingRoute.post("/checkout-session", async (c) => {
     return jsonFail(c, 409, "Esta organização já tem acesso liberado.", "CONFLICT");
   }
 
+  const { data: auPay, error: auPayErr } = await supabaseAdmin
+    .from("app_users")
+    .select("billing_stripe_access_at")
+    .eq("id", userId)
+    .eq("organization_id", organizationId)
+    .maybeSingle();
+  if (auPayErr) return jsonFail(c, 503, auPayErr.message, "UNAVAILABLE");
+  const auPayRow = auPay as { billing_stripe_access_at?: string | null } | null;
+  if (auPayRow?.billing_stripe_access_at) {
+    return jsonFail(c, 409, "Este usuário já possui acesso pago via Stripe.", "CONFLICT");
+  }
+
   const origin = checkoutOrigin();
   const successUrl = `${origin}/assinatura?checkout=success`;
   const cancelUrl = `${origin}/assinatura?checkout=cancel`;
@@ -223,10 +235,10 @@ billingRoute.post("/checkout-session", async (c) => {
     line_items: [{ price: priceId, quantity: 1 }],
     success_url: successUrl,
     cancel_url: cancelUrl,
-    client_reference_id: organizationId,
+    client_reference_id: `${organizationId}:${userId}`,
     metadata: {
       organization_id: organizationId,
-      user_id: userId,
+      payer_user_id: userId,
     },
     subscription_data: {
       metadata: {
@@ -274,13 +286,38 @@ billingRoute.post("/webhook", async (c) => {
       case "checkout.session.completed":
       case "checkout.session.async_payment_succeeded": {
         const session = event.data.object as Stripe.Checkout.Session;
-        const rawOrg =
+        const cref =
+          typeof session.client_reference_id === "string" ? session.client_reference_id.trim() : "";
+        const metaOrgRaw =
           typeof session.metadata?.organization_id === "string"
-            ? session.metadata.organization_id
-            : typeof session.client_reference_id === "string"
-              ? session.client_reference_id
-              : undefined;
-        const orgId = rawOrg?.trim();
+            ? session.metadata.organization_id.trim()
+            : "";
+        const metaPayerRaw =
+          typeof session.metadata?.payer_user_id === "string"
+            ? session.metadata.payer_user_id.trim()
+            : typeof session.metadata?.user_id === "string"
+              ? session.metadata.user_id.trim()
+              : "";
+
+        let orgId: string | null = null;
+        let payerUserId: string | null = null;
+
+        if (cref.includes(":")) {
+          const [a, b, ...rest] = cref.split(":");
+          if (rest.length === 0 && isUuid(a) && isUuid(b)) {
+            orgId = a;
+            payerUserId = b;
+          }
+        } else if (cref && isUuid(cref)) {
+          orgId = cref;
+        }
+        if (!orgId && metaOrgRaw && isUuid(metaOrgRaw)) {
+          orgId = metaOrgRaw;
+        }
+        if (!payerUserId && metaPayerRaw && isUuid(metaPayerRaw)) {
+          payerUserId = metaPayerRaw;
+        }
+
         if (!orgId || !isUuid(orgId)) break;
 
         const customerId =
@@ -296,15 +333,34 @@ billingRoute.post("/webhook", async (c) => {
               ? (session.subscription as Stripe.Subscription).id
               : null;
 
-        const patch: {
-          billing_stripe_active: boolean;
-          stripe_customer_id?: string;
-          stripe_subscription_id?: string | null;
-        } = { billing_stripe_active: true };
-        if (customerId) patch.stripe_customer_id = customerId;
-        if (subId !== null && subId !== undefined) patch.stripe_subscription_id = subId;
+        const now = new Date().toISOString();
 
-        await supabaseAdmin.from("organizations").update(patch).eq("id", orgId);
+        if (payerUserId && isUuid(payerUserId)) {
+          const { error: auErr } = await supabaseAdmin
+            .from("app_users")
+            .update({ billing_stripe_access_at: now })
+            .eq("id", payerUserId)
+            .eq("organization_id", orgId);
+          if (auErr) throw new Error(auErr.message);
+
+          const orgPatch: { stripe_customer_id?: string; stripe_subscription_id?: string | null } = {};
+          if (customerId) orgPatch.stripe_customer_id = customerId;
+          if (subId !== null && subId !== undefined) orgPatch.stripe_subscription_id = subId;
+          if (Object.keys(orgPatch).length > 0) {
+            const { error: orgUpErr } = await supabaseAdmin.from("organizations").update(orgPatch).eq("id", orgId);
+            if (orgUpErr) throw new Error(orgUpErr.message);
+          }
+        } else {
+          const patch: {
+            billing_stripe_active: boolean;
+            stripe_customer_id?: string;
+            stripe_subscription_id?: string | null;
+          } = { billing_stripe_active: true };
+          if (customerId) patch.stripe_customer_id = customerId;
+          if (subId !== null && subId !== undefined) patch.stripe_subscription_id = subId;
+          const { error: orgErr2 } = await supabaseAdmin.from("organizations").update(patch).eq("id", orgId);
+          if (orgErr2) throw new Error(orgErr2.message);
+        }
         break;
       }
       case "customer.subscription.updated": {

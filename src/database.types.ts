@@ -76,39 +76,42 @@ export type Database = {
       }
       app_users: {
         Row: {
-          id: string
-          organization_id: string | null
-          email: string | null
-          name: string | null
-          role: string
           active: boolean
-          deleted_at: string | null
-          last_sign_in_at: string | null
+          billing_stripe_access_at: string | null
           created_at: string
+          deleted_at: string | null
+          email: string | null
+          id: string
+          last_sign_in_at: string | null
+          name: string | null
+          organization_id: string | null
+          role: string
           updated_at: string
         }
         Insert: {
-          id: string
-          organization_id?: string | null
-          email?: string | null
-          name?: string | null
-          role?: string
           active?: boolean
-          deleted_at?: string | null
-          last_sign_in_at?: string | null
+          billing_stripe_access_at?: string | null
           created_at?: string
+          deleted_at?: string | null
+          email?: string | null
+          id: string
+          last_sign_in_at?: string | null
+          name?: string | null
+          organization_id?: string | null
+          role?: string
           updated_at?: string
         }
         Update: {
-          id?: string
-          organization_id?: string | null
-          email?: string | null
-          name?: string | null
-          role?: string
           active?: boolean
-          deleted_at?: string | null
-          last_sign_in_at?: string | null
+          billing_stripe_access_at?: string | null
           created_at?: string
+          deleted_at?: string | null
+          email?: string | null
+          id?: string
+          last_sign_in_at?: string | null
+          name?: string | null
+          organization_id?: string | null
+          role?: string
           updated_at?: string
         }
         Relationships: [
