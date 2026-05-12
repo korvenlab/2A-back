@@ -44,6 +44,16 @@ function staffNeedsBilling(roleSlug: string | null): boolean {
   return s === "admin" || s === "vendedor";
 }
 
+/** `billing_complimentary_access_until` vindo do PostgREST (timestamptz → ISO string). */
+function complimentaryAccessIsActive(raw: unknown): boolean {
+  if (raw == null) return false;
+  if (typeof raw !== "string") return false;
+  const s = raw.trim();
+  if (!s) return false;
+  const ms = Date.parse(s);
+  return Number.isFinite(ms) && ms > Date.now();
+}
+
 export const sessionRoute = new Hono();
 
 sessionRoute.get("/menu", async (c) => {
@@ -167,11 +177,7 @@ sessionRoute.get("/menu", async (c) => {
     }
 
     userStripePaid = !!au?.billing_stripe_access_at;
-    const complimentaryUntil = au?.billing_complimentary_access_until;
-    userComplimentaryActive =
-      typeof complimentaryUntil === "string" &&
-      complimentaryUntil.trim() !== "" &&
-      new Date(complimentaryUntil).getTime() > Date.now();
+    userComplimentaryActive = complimentaryAccessIsActive(au?.billing_complimentary_access_until);
 
     const satisfied = billingStripe || billingManual || userStripePaid || userComplimentaryActive;
     if (!satisfied && billingOrgId) {
