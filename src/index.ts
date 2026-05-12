@@ -63,7 +63,7 @@ app.get("/", (c) =>
   jsonOk(c, {
     ok: true,
     service: "2avendas-backend",
-    hint: "Dashboard executivo: GET /dashboard | KPIs: GET /metrics | Feedback: GET/DELETE /feedback/messages (API key) | Menu: GET /api/session/menu (Bearer) | Billing: checkout POST /api/billing/checkout-session (Bearer admin), webhook POST /api/billing/webhook (Stripe), Korven link POST /api/billing/organization-access-link (X-Billing-Admin-Secret), claim POST /api/billing/claim-unlock | Saúde: GET /health",
+    hint: "Dashboard executivo: GET /dashboard | KPIs: GET /metrics | Feedback: GET/DELETE /feedback/messages (API key) | Menu: GET /api/session/menu (Bearer) | Billing: checkout POST /api/billing/checkout-session (Bearer admin), webhook POST /api/billing/webhook (Stripe), Korven link POST /api/billing/organization-access-link (X-Billing-Admin-Secret), claim POST /api/billing/claim-unlock, cortesia GET/POST/PATCH/DELETE /api/billing/promo-links (admin), resgate POST /api/billing/redeem-promo (Bearer) | Saúde: GET /health",
   }),
 );
 

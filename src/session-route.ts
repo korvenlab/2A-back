@@ -132,6 +132,7 @@ sessionRoute.get("/menu", async (c) => {
   let billingStripe = false;
   let billingManual = false;
   let userStripePaid = false;
+  let userComplimentaryActive = false;
   if (staffNeedsBilling(roleSlug) && organizationId) {
     const { data: orgRow, error: orgErr } = await supabaseAdmin
       .from("organizations")
@@ -148,14 +149,23 @@ sessionRoute.get("/menu", async (c) => {
 
     const { data: auRow, error: auErr } = await supabaseAdmin
       .from("app_users")
-      .select("billing_stripe_access_at")
+      .select("billing_stripe_access_at, billing_complimentary_access_until")
       .eq("id", userId)
       .eq("organization_id", organizationId)
       .maybeSingle();
     if (auErr) return jsonFail(c, 503, auErr.message, "UNAVAILABLE");
-    userStripePaid = !!(auRow as { billing_stripe_access_at?: string | null } | null)?.billing_stripe_access_at;
+    const au = auRow as {
+      billing_stripe_access_at?: string | null;
+      billing_complimentary_access_until?: string | null;
+    } | null;
+    userStripePaid = !!au?.billing_stripe_access_at;
+    const complimentaryUntil = au?.billing_complimentary_access_until;
+    userComplimentaryActive =
+      typeof complimentaryUntil === "string" &&
+      complimentaryUntil.trim() !== "" &&
+      new Date(complimentaryUntil).getTime() > Date.now();
 
-    const satisfied = billingStripe || billingManual || userStripePaid;
+    const satisfied = billingStripe || billingManual || userStripePaid || userComplimentaryActive;
     if (!satisfied) {
       menu = emptyMenu();
     }
@@ -163,7 +173,11 @@ sessionRoute.get("/menu", async (c) => {
 
   const billingRequired = staffNeedsBilling(roleSlug) && !!organizationId;
   const billingSatisfied =
-    !billingRequired || billingStripe || billingManual || userStripePaid;
+    !billingRequired ||
+    billingStripe ||
+    billingManual ||
+    userStripePaid ||
+    userComplimentaryActive;
 
   return jsonOk(c, {
     ok: true,

@@ -1,4 +1,6 @@
+import { randomBytes } from "node:crypto";
 import { Hono } from "hono";
+import type { Context } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import Stripe from "stripe";
 import { mintBillingUnlockToken, verifyBillingUnlockToken } from "./billing-unlock-token.js";
@@ -68,7 +70,7 @@ billingRoute.post("/organization-access", async (c) => {
 
   if (error) return jsonFail(c, 503, error.message, "UNAVAILABLE");
 
-  return jsonOk(c, { organization_id: organizationId, billing_manual_unlock: unlock });
+  return jsonOk(c, { ok: true as const, organization_id: organizationId, billing_manual_unlock: unlock });
 });
 
 /** Korven Dashboard: gera URL pública (como /wagoo) para o cliente abrir e liberar a organização. */
@@ -118,9 +120,12 @@ billingRoute.post("/organization-access-link", async (c) => {
   const unlockUrl = `${front}/billing/unlock?t=${encodeURIComponent(minted.token)}`;
 
   return jsonOk(c, {
-    unlock_url: unlockUrl,
-    expires_at: minted.expires_at,
-    organization_id: organizationId,
+    ok: true as const,
+    data: {
+      unlock_url: unlockUrl,
+      expires_at: minted.expires_at,
+      organization_id: organizationId,
+    },
   });
 });
 
@@ -161,7 +166,271 @@ billingRoute.post("/claim-unlock", async (c) => {
 
   if (error) return jsonFail(c, 503, error.message, "UNAVAILABLE");
 
-  return jsonOk(c, { organization_id: verified.organizationId });
+  return jsonOk(c, { ok: true as const, organization_id: verified.organizationId });
+});
+
+function korvenBillingSecret(): string | null {
+  return process.env.KORVEN_BILLING_ADMIN_SECRET?.trim() ?? null;
+}
+
+function assertBillingAdmin(c: Context): boolean {
+  const secret = korvenBillingSecret();
+  if (!secret) return false;
+  return c.req.header("X-Billing-Admin-Secret") === secret;
+}
+
+function randomPromoCode(): string {
+  return randomBytes(8).toString("hex").slice(0, 12).toLowerCase();
+}
+
+function signupPromoUrl(code: string): string {
+  const front = checkoutOrigin();
+  return `${front}/login?two_avendas_promo=${encodeURIComponent(code)}`;
+}
+
+type PromoLinkRow = {
+  id: string;
+  code: string;
+  label: string | null;
+  complimentary_days: number;
+  max_redemptions: number | null;
+  redemption_count: number;
+  is_active: boolean;
+  created_at: string;
+};
+
+function mapPromoRow(row: PromoLinkRow) {
+  return {
+    id: row.id,
+    code: row.code,
+    label: row.label,
+    complimentary_days: row.complimentary_days,
+    max_redemptions: row.max_redemptions,
+    redemption_count: row.redemption_count,
+    expires_at: null as string | null,
+    is_active: row.is_active,
+    created_at: row.created_at,
+    signup_url: signupPromoUrl(row.code),
+  };
+}
+
+billingRoute.get("/promo-links", async (c) => {
+  const secret = korvenBillingSecret();
+  if (!secret) {
+    return jsonFail(c, 503, "Unlock administrativo não configurado.", "UNAVAILABLE");
+  }
+  if (!assertBillingAdmin(c)) {
+    return jsonFail(c, 401, "Credencial administrativa inválida.", "UNAUTHORIZED");
+  }
+
+  const { data, error } = await supabaseAdmin
+    .from("billing_promo_links")
+    .select("id, code, label, complimentary_days, max_redemptions, redemption_count, is_active, created_at")
+    .order("created_at", { ascending: false });
+
+  if (error) return jsonFail(c, 503, error.message, "UNAVAILABLE");
+  const items = (data ?? []).map((r) => mapPromoRow(r as PromoLinkRow));
+  return jsonOk(c, { ok: true as const, data: { items } });
+});
+
+billingRoute.post("/promo-links", async (c) => {
+  const secret = korvenBillingSecret();
+  if (!secret) {
+    return jsonFail(c, 503, "Unlock administrativo não configurado.", "UNAVAILABLE");
+  }
+  if (!assertBillingAdmin(c)) {
+    return jsonFail(c, 401, "Credencial administrativa inválida.", "UNAUTHORIZED");
+  }
+
+  let body: {
+    label?: string | null;
+    complimentary_days?: number;
+    max_redemptions?: number | null;
+  };
+  try {
+    body = (await c.req.json()) as {
+      label?: string | null;
+      complimentary_days?: number;
+      max_redemptions?: number | null;
+    };
+  } catch {
+    return jsonFail(c, 400, "JSON inválido.", "BAD_REQUEST");
+  }
+
+  const rawDays =
+    typeof body.complimentary_days === "number" && Number.isFinite(body.complimentary_days)
+      ? Math.floor(body.complimentary_days)
+      : 60;
+  const days = Math.min(730, Math.max(1, rawDays));
+
+  let maxRed: number | null = null;
+  if (body.max_redemptions !== undefined && body.max_redemptions !== null) {
+    const n = Math.floor(Number(body.max_redemptions));
+    if (!Number.isFinite(n) || n < 1) {
+      return jsonFail(c, 400, "max_redemptions inválido.", "BAD_REQUEST");
+    }
+    maxRed = n;
+  }
+
+  const label =
+    typeof body.label === "string" && body.label.trim() ? body.label.trim().slice(0, 200) : null;
+
+  let inserted: PromoLinkRow | null = null;
+  for (let attempt = 0; attempt < 8; attempt++) {
+    const code = randomPromoCode();
+    const { data, error } = await supabaseAdmin
+      .from("billing_promo_links")
+      .insert({
+        code,
+        label,
+        complimentary_days: days,
+        max_redemptions: maxRed,
+        redemption_count: 0,
+        is_active: true,
+      })
+      .select("id, code, label, complimentary_days, max_redemptions, redemption_count, is_active, created_at")
+      .maybeSingle();
+
+    if (!error && data) {
+      inserted = data as PromoLinkRow;
+      break;
+    }
+    if (error && error.code !== "23505") {
+      return jsonFail(c, 503, error.message, "UNAVAILABLE");
+    }
+  }
+
+  if (!inserted) {
+    return jsonFail(c, 503, "Não foi possível gerar código único.", "UNAVAILABLE");
+  }
+
+  return jsonOk(c, { ok: true as const, data: mapPromoRow(inserted) });
+});
+
+billingRoute.patch("/promo-links/:id", async (c) => {
+  const secret = korvenBillingSecret();
+  if (!secret) {
+    return jsonFail(c, 503, "Unlock administrativo não configurado.", "UNAVAILABLE");
+  }
+  if (!assertBillingAdmin(c)) {
+    return jsonFail(c, 401, "Credencial administrativa inválida.", "UNAUTHORIZED");
+  }
+
+  const id = c.req.param("id")?.trim() ?? "";
+  if (!isUuid(id)) {
+    return jsonFail(c, 400, "id inválido.", "BAD_REQUEST");
+  }
+
+  let body: { is_active?: boolean };
+  try {
+    body = (await c.req.json()) as { is_active?: boolean };
+  } catch {
+    return jsonFail(c, 400, "JSON inválido.", "BAD_REQUEST");
+  }
+
+  if (typeof body.is_active !== "boolean") {
+    return jsonFail(c, 400, "is_active (boolean) é obrigatório.", "BAD_REQUEST");
+  }
+
+  const { data, error } = await supabaseAdmin
+    .from("billing_promo_links")
+    .update({ is_active: body.is_active })
+    .eq("id", id)
+    .select("id, code, label, complimentary_days, max_redemptions, redemption_count, is_active, created_at")
+    .maybeSingle();
+
+  if (error) return jsonFail(c, 503, error.message, "UNAVAILABLE");
+  if (!data) {
+    return jsonFail(c, 404, "Link não encontrado.", "NOT_FOUND");
+  }
+
+  return jsonOk(c, { ok: true as const, data: mapPromoRow(data as PromoLinkRow) });
+});
+
+billingRoute.delete("/promo-links/:id", async (c) => {
+  const secret = korvenBillingSecret();
+  if (!secret) {
+    return jsonFail(c, 503, "Unlock administrativo não configurado.", "UNAVAILABLE");
+  }
+  if (!assertBillingAdmin(c)) {
+    return jsonFail(c, 401, "Credencial administrativa inválida.", "UNAUTHORIZED");
+  }
+
+  const id = c.req.param("id")?.trim() ?? "";
+  if (!isUuid(id)) {
+    return jsonFail(c, 400, "id inválido.", "BAD_REQUEST");
+  }
+
+  const { error } = await supabaseAdmin.from("billing_promo_links").delete().eq("id", id);
+  if (error) return jsonFail(c, 503, error.message, "UNAVAILABLE");
+
+  return jsonOk(c, { ok: true as const, data: { id, deleted: true } });
+});
+
+function staffMayRedeemPromo(roleSlug: string | null): boolean {
+  const s = roleSlug?.trim().toLowerCase() ?? "";
+  return s === "admin" || s === "vendedor";
+}
+
+/** Autenticado (Bearer): resgata código visto em `?two_avendas_promo=` no login. */
+billingRoute.post("/redeem-promo", async (c) => {
+  const token = bearerToken(c.req.header("Authorization"));
+  if (!token) {
+    return jsonFail(c, 401, "Autenticação necessária (Bearer).", "UNAUTHORIZED");
+  }
+
+  const resolved = await resolveBearerSession(token);
+  if (!resolved.ok) {
+    return jsonFail(c, resolved.status as ContentfulStatusCode, resolved.message, resolved.code);
+  }
+  if (resolved.data.inactive) {
+    return jsonFail(c, 403, "Conta inativa.", "FORBIDDEN");
+  }
+
+  const { userId, organizationId, roleSlug } = resolved.data;
+  if (!staffMayRedeemPromo(roleSlug)) {
+    return jsonFail(
+      c,
+      403,
+      "Apenas administrador ou vendedor pode resgatar o código promocional.",
+      "FORBIDDEN",
+    );
+  }
+  if (!organizationId) {
+    return jsonFail(c, 400, "Sem organização ativa.", "BAD_REQUEST");
+  }
+
+  let body: { code?: string };
+  try {
+    body = (await c.req.json()) as { code?: string };
+  } catch {
+    return jsonFail(c, 400, "JSON inválido.", "BAD_REQUEST");
+  }
+
+  const rawCode = typeof body.code === "string" ? body.code.trim() : "";
+  if (!rawCode) {
+    return jsonFail(c, 400, "code é obrigatório.", "BAD_REQUEST");
+  }
+
+  const { data: rpcData, error: rpcErr } = await supabaseAdmin.rpc("redeem_billing_promo_link", {
+    p_code: rawCode,
+    p_user_id: userId,
+    p_org_id: organizationId,
+  });
+
+  if (rpcErr) {
+    return jsonFail(c, 503, rpcErr.message, "UNAVAILABLE");
+  }
+
+  const root = rpcData as { ok?: boolean; error?: string; complimentary_until?: string };
+  if (!root?.ok) {
+    return jsonFail(c, 400, root?.error ?? "Resgate não permitido.", "BAD_REQUEST");
+  }
+
+  return jsonOk(c, {
+    ok: true as const,
+    data: { complimentary_until: root.complimentary_until ?? null },
+  });
 });
 
 billingRoute.post("/checkout-session", async (c) => {

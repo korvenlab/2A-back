@@ -77,6 +77,7 @@ export type Database = {
       app_users: {
         Row: {
           active: boolean
+          billing_complimentary_access_until: string | null
           billing_stripe_access_at: string | null
           created_at: string
           deleted_at: string | null
@@ -90,6 +91,7 @@ export type Database = {
         }
         Insert: {
           active?: boolean
+          billing_complimentary_access_until?: string | null
           billing_stripe_access_at?: string | null
           created_at?: string
           deleted_at?: string | null
@@ -103,6 +105,7 @@ export type Database = {
         }
         Update: {
           active?: boolean
+          billing_complimentary_access_until?: string | null
           billing_stripe_access_at?: string | null
           created_at?: string
           deleted_at?: string | null
@@ -635,6 +638,88 @@ export type Database = {
           },
         ]
       }
+      billing_promo_links: {
+        Row: {
+          id: string
+          code: string
+          label: string | null
+          complimentary_days: number
+          max_redemptions: number | null
+          redemption_count: number
+          is_active: boolean
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          code: string
+          label?: string | null
+          complimentary_days: number
+          max_redemptions?: number | null
+          redemption_count?: number
+          is_active?: boolean
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          code?: string
+          label?: string | null
+          complimentary_days?: number
+          max_redemptions?: number | null
+          redemption_count?: number
+          is_active?: boolean
+          created_at?: string
+        }
+        Relationships: []
+      }
+      billing_promo_redemptions: {
+        Row: {
+          id: string
+          promo_link_id: string
+          user_id: string
+          organization_id: string
+          redeemed_at: string
+          complimentary_until: string
+        }
+        Insert: {
+          id?: string
+          promo_link_id: string
+          user_id: string
+          organization_id: string
+          redeemed_at?: string
+          complimentary_until: string
+        }
+        Update: {
+          id?: string
+          promo_link_id?: string
+          user_id?: string
+          organization_id?: string
+          redeemed_at?: string
+          complimentary_until?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "billing_promo_redemptions_promo_link_id_fkey"
+            columns: ["promo_link_id"]
+            isOneToOne: false
+            referencedRelation: "billing_promo_links"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "billing_promo_redemptions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "app_users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "billing_promo_redemptions_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           created_at: string
@@ -699,6 +784,10 @@ export type Database = {
       organization_primary_admin_user_id: {
         Args: { p_organization_id: string }
         Returns: string | null
+      }
+      redeem_billing_promo_link: {
+        Args: { p_code: string; p_user_id: string; p_org_id: string }
+        Returns: Json
       }
     }
     Enums: {
