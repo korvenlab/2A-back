@@ -69,7 +69,8 @@ A tabela **`assinaturas`** deve ser preenchida pelo fluxo de cobrança/admin. Ca
 - `SUPABASE_URL`
 - `SUPABASE_SERVICE_ROLE_KEY`
 - `METRICS_API_KEY` — obrigatória para **`GET /metrics`** e **`GET /dashboard`** responderem 200.
-- `FRONTEND_ORIGIN` — URL do frontend na Vercel (CORS). Várias origens: separadas por vírgula.
+- `FRONTEND_ORIGIN` — origens permitidas no CORS (uma ou várias, separadas por vírgula; pode incluir preview Vercel + domínio próprio).
+- `PUBLIC_APP_ORIGIN` — (opcional) URL canónica do app **só para links** gerados no servidor (códigos de cortesia `?two_avendas_promo=`, `/billing/unlock`, redirects Stripe). Use `https://2avendas.com` se `FRONTEND_ORIGIN` começar pela URL da Vercel; senão a primeira origem de `FRONTEND_ORIGIN` é usada nos links.
 
 ## Deploy Render
 

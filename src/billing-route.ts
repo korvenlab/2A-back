@@ -19,11 +19,21 @@ function stripeClient(): Stripe | null {
   return new Stripe(key);
 }
 
+/**
+ * URL base do app em links enviados ao utilizador (cortesia, unlock, redirects Stripe).
+ * Use `PUBLIC_APP_ORIGIN` quando `FRONTEND_ORIGIN` tiver várias origens (CORS) e a primeira
+ * for a preview Vercel — assim os links podem ser sempre https://2avendas.com.
+ */
 function checkoutOrigin(): string {
+  const explicit = process.env.PUBLIC_APP_ORIGIN?.trim();
+  if (explicit && explicit !== "*") {
+    const one = explicit.split(",")[0]?.trim().replace(/\/+$/, "") ?? "";
+    if (one) return one;
+  }
   const raw = process.env.FRONTEND_ORIGIN?.trim();
   if (!raw || raw === "*") return "http://localhost:5173";
-  const first = raw.split(",")[0]?.trim();
-  return first?.replace(/\/+$/, "") || "http://localhost:5173";
+  const first = raw.split(",")[0]?.trim().replace(/\/+$/, "") ?? "";
+  return first || "http://localhost:5173";
 }
 
 const UUID_RE =
