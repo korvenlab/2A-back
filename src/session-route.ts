@@ -44,13 +44,21 @@ function staffNeedsBilling(roleSlug: string | null): boolean {
   return s === "admin" || s === "vendedor";
 }
 
-/** `billing_complimentary_access_until` vindo do PostgREST (timestamptz → ISO string). */
+/** Cortesia ainda válida (PostgREST pode devolver string ISO, Date em runtimes JS, ou epoch em edge cases). */
 function complimentaryAccessIsActive(raw: unknown): boolean {
   if (raw == null) return false;
-  if (typeof raw !== "string") return false;
-  const s = raw.trim();
-  if (!s) return false;
-  const ms = Date.parse(s);
+  let ms: number;
+  if (typeof raw === "string") {
+    const s = raw.trim();
+    if (!s) return false;
+    ms = Date.parse(s);
+  } else if (typeof raw === "number" && Number.isFinite(raw)) {
+    ms = raw < 1e12 ? raw * 1000 : raw;
+  } else if (raw instanceof Date) {
+    ms = raw.getTime();
+  } else {
+    return false;
+  }
   return Number.isFinite(ms) && ms > Date.now();
 }
 
