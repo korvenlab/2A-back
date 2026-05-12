@@ -406,7 +406,18 @@ billingRoute.post("/redeem-promo", async (c) => {
       "FORBIDDEN",
     );
   }
-  if (!organizationId) {
+
+  const { data: auOrgRow, error: auOrgErr } = await supabaseAdmin
+    .from("app_users")
+    .select("organization_id")
+    .eq("id", userId)
+    .maybeSingle();
+  if (auOrgErr) {
+    return jsonFail(c, 503, auOrgErr.message, "UNAVAILABLE");
+  }
+  const canonOrg =
+    (auOrgRow as { organization_id?: string | null } | null)?.organization_id ?? organizationId;
+  if (!canonOrg) {
     return jsonFail(c, 400, "Sem organização ativa.", "BAD_REQUEST");
   }
 
@@ -425,7 +436,7 @@ billingRoute.post("/redeem-promo", async (c) => {
   const { data: rpcData, error: rpcErr } = await supabaseAdmin.rpc("redeem_billing_promo_link", {
     p_code: rawCode,
     p_user_id: userId,
-    p_org_id: organizationId,
+    p_org_id: canonOrg,
   });
 
   if (rpcErr) {

@@ -133,32 +133,39 @@ sessionRoute.get("/menu", async (c) => {
   let billingManual = false;
   let userStripePaid = false;
   let userComplimentaryActive = false;
-  if (staffNeedsBilling(roleSlug) && organizationId) {
-    const { data: orgRow, error: orgErr } = await supabaseAdmin
-      .from("organizations")
-      .select("billing_stripe_active, billing_manual_unlock")
-      .eq("id", organizationId)
-      .maybeSingle();
-    if (orgErr) return jsonFail(c, 503, orgErr.message, "UNAVAILABLE");
-    const row = orgRow as {
-      billing_stripe_active?: boolean | null;
-      billing_manual_unlock?: boolean | null;
-    } | null;
-    billingStripe = !!row?.billing_stripe_active;
-    billingManual = !!row?.billing_manual_unlock;
+  /** Org para Stripe/unlock manual: app_users.organization_id tem prioridade sobre a resolvida no Bearer. */
+  let responseOrganizationId = organizationId;
 
-    // Uma linha por utilizador (PK = id). Cortesia/Stripe por user ficam aqui; não filtrar por org —
-    // evita mismatch raro entre `resolveBearerSession` e `organization_id` na linha.
+  if (staffNeedsBilling(roleSlug)) {
     const { data: auRow, error: auErr } = await supabaseAdmin
       .from("app_users")
-      .select("billing_stripe_access_at, billing_complimentary_access_until")
+      .select("organization_id, billing_stripe_access_at, billing_complimentary_access_until")
       .eq("id", userId)
       .maybeSingle();
     if (auErr) return jsonFail(c, 503, auErr.message, "UNAVAILABLE");
     const au = auRow as {
+      organization_id?: string | null;
       billing_stripe_access_at?: string | null;
       billing_complimentary_access_until?: string | null;
     } | null;
+    const billingOrgId = au?.organization_id ?? organizationId;
+    responseOrganizationId = billingOrgId ?? organizationId;
+
+    if (billingOrgId) {
+      const { data: orgRow, error: orgErr } = await supabaseAdmin
+        .from("organizations")
+        .select("billing_stripe_active, billing_manual_unlock")
+        .eq("id", billingOrgId)
+        .maybeSingle();
+      if (orgErr) return jsonFail(c, 503, orgErr.message, "UNAVAILABLE");
+      const row = orgRow as {
+        billing_stripe_active?: boolean | null;
+        billing_manual_unlock?: boolean | null;
+      } | null;
+      billingStripe = !!row?.billing_stripe_active;
+      billingManual = !!row?.billing_manual_unlock;
+    }
+
     userStripePaid = !!au?.billing_stripe_access_at;
     const complimentaryUntil = au?.billing_complimentary_access_until;
     userComplimentaryActive =
@@ -167,12 +174,12 @@ sessionRoute.get("/menu", async (c) => {
       new Date(complimentaryUntil).getTime() > Date.now();
 
     const satisfied = billingStripe || billingManual || userStripePaid || userComplimentaryActive;
-    if (!satisfied) {
+    if (!satisfied && billingOrgId) {
       menu = emptyMenu();
     }
   }
 
-  const billingRequired = staffNeedsBilling(roleSlug) && !!organizationId;
+  const billingRequired = staffNeedsBilling(roleSlug) && !!responseOrganizationId;
   const billingSatisfied =
     !billingRequired ||
     billingStripe ||
@@ -184,7 +191,7 @@ sessionRoute.get("/menu", async (c) => {
     ok: true,
     data: {
       user_id: userId,
-      organization_id: organizationId,
+      organization_id: responseOrganizationId,
       role: roleSlug,
       permissions,
       menu,
