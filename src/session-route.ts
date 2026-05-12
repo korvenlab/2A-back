@@ -147,11 +147,12 @@ sessionRoute.get("/menu", async (c) => {
     billingStripe = !!row?.billing_stripe_active;
     billingManual = !!row?.billing_manual_unlock;
 
+    // Uma linha por utilizador (PK = id). Cortesia/Stripe por user ficam aqui; não filtrar por org —
+    // evita mismatch raro entre `resolveBearerSession` e `organization_id` na linha.
     const { data: auRow, error: auErr } = await supabaseAdmin
       .from("app_users")
       .select("billing_stripe_access_at, billing_complimentary_access_until")
       .eq("id", userId)
-      .eq("organization_id", organizationId)
       .maybeSingle();
     if (auErr) return jsonFail(c, 503, auErr.message, "UNAVAILABLE");
     const au = auRow as {
@@ -193,6 +194,7 @@ sessionRoute.get("/menu", async (c) => {
         stripe_active: billingStripe,
         manual_unlock: billingManual,
         user_stripe_paid: userStripePaid,
+        user_complimentary_active: userComplimentaryActive,
       },
     },
   });
