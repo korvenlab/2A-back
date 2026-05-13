@@ -4,6 +4,7 @@
 -- o UPDATE não alterava linhas e orders.total ficava 0 (carrinho ok, lista de pedidos errada).
 
 drop policy if exists "Cliente updates own draft orders" on public.orders;
+drop policy if exists "Cliente updates own orders" on public.orders;
 
 create policy "Cliente updates own orders"
 on public.orders

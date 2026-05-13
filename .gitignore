@@ -2,6 +2,7 @@ node_modules
 dist
 .tools
 supabase/.temp
+mig-payloads/
 *.local
 .env
 .env.*

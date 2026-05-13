@@ -21,12 +21,14 @@ function emptyMenu() {
 function buildMenu(permissions: Set<string>, roleSlug: string | null) {
   const slug = roleSlug?.trim().toLowerCase() ?? "";
   const isAdmin = slug === "admin";
+  /** `orders:view` no cliente serve ao portal B2B (RLS); /pedidos e /orcamentos são só staff. */
+  const staffOrdersScreens = permissions.has("orders:view") && slug !== "cliente";
   return {
     dashboard: permissions.has("dashboard:view"),
     catalogo: permissions.has("products:manage"),
     clientes: permissions.has("customers:view"),
-    pedidos: permissions.has("orders:view"),
-    orcamentos: permissions.has("orders:view"),
+    pedidos: staffOrdersScreens,
+    orcamentos: staffOrdersScreens,
     funil: permissions.has("customers:view"),
     visitas: permissions.has("customers:view"),
     portal: permissions.has("portal:view"),
