@@ -8,3 +8,11 @@ project_id = "otunngvmzzmnfwwbabgp"
 [auth.email]
 enable_signup = true
 enable_confirmations = false
+# SMTP Resend (dev local). Produção: Authentication → Email → SMTP no painel Supabase.
+# https://resend.com/docs/send-with-supabase-smtp
+smtp_admin_email = "env(RESEND_FROM_EMAIL)"
+smtp_host = "env(RESEND_SMTP_HOST)"
+smtp_port = 465
+smtp_user = "env(RESEND_SMTP_USER)"
+smtp_pass = "env(RESEND_SMTP_PASS)"
+smtp_sender_name = "2AVendas"
