@@ -785,6 +785,10 @@ export type Database = {
         Args: { p_organization_id: string }
         Returns: string | null
       }
+      ensure_order_number: {
+        Args: { p_order_id: string }
+        Returns: number
+      }
       redeem_billing_promo_link: {
         Args: { p_code: string; p_user_id: string; p_org_id: string }
         Returns: Json
