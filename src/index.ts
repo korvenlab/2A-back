@@ -10,6 +10,7 @@ import { metricsRoute } from "./metrics-route.js";
 import { sessionRoute } from "./session-route.js";
 import { feedbackRoute } from "./feedback-route.js";
 import { billingRoute } from "./billing-route.js";
+import { startDashboardOutboxWorker } from "./dashboard-publisher.js";
 
 const app = new Hono();
 
@@ -47,6 +48,7 @@ app.use(
       "x-admin-secret",
       "X-Billing-Admin-Secret",
       "Stripe-Signature",
+      "Idempotency-Key",
     ],
   }),
 );
@@ -86,4 +88,5 @@ const port = Number(process.env.PORT ?? 8787);
 
 serve({ fetch: app.fetch, port }, (info) => {
   console.log(`2avendas-backend listening on ${info.address}:${info.port}`);
+  startDashboardOutboxWorker();
 });

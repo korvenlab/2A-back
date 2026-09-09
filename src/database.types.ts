@@ -82,6 +82,7 @@ export type Database = {
           created_at: string
           deleted_at: string | null
           email: string | null
+          first_login_published_at: string | null
           id: string
           last_sign_in_at: string | null
           name: string | null
@@ -96,6 +97,7 @@ export type Database = {
           created_at?: string
           deleted_at?: string | null
           email?: string | null
+          first_login_published_at?: string | null
           id: string
           last_sign_in_at?: string | null
           name?: string | null
@@ -110,6 +112,7 @@ export type Database = {
           created_at?: string
           deleted_at?: string | null
           email?: string | null
+          first_login_published_at?: string | null
           id?: string
           last_sign_in_at?: string | null
           name?: string | null

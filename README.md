@@ -71,6 +71,28 @@ A tabela **`assinaturas`** deve ser preenchida pelo fluxo de cobrança/admin. Ca
 - `METRICS_API_KEY` — obrigatória para **`GET /metrics`** e **`GET /dashboard`** responderem 200.
 - `FRONTEND_ORIGIN` — origens permitidas no CORS (uma ou várias, separadas por vírgula; pode incluir preview Vercel + domínio próprio).
 - `PUBLIC_APP_ORIGIN` — (opcional) URL canónica do app **só para links** gerados no servidor (códigos de cortesia `?two_avendas_promo=`, `/billing/unlock`, redirects Stripe). Use `https://2avendas.com` se `FRONTEND_ORIGIN` começar pela URL da Vercel; senão a primeira origem de `FRONTEND_ORIGIN` é usada nos links.
+- `DASHBOARD_INGEST_URL` + `TWO_AVENDAS_DASHBOARD_INGEST_SECRET` — habilitam a integração com o control plane. Sem qualquer uma delas, o publisher não faz chamadas externas.
+- `DASHBOARD_INGEST_TIMEOUT_MS` / `DASHBOARD_INGEST_RETRIES` — opcionais (defaults `4000` ms e `2` retries).
+
+## Integração com o control plane
+
+O publisher envia envelopes JSON com `event_id`, `event_type`, `occurred_at`, `product: "2avendas"`, `external_user_id`, `organization_id`/`email` quando disponíveis e `payload`. A assinatura HMAC-SHA256 cobre `${timestamp}.${rawBody}` e é enviada em `x-korven-signature`, junto com `x-korven-product` e `x-korven-timestamp`.
+
+A migration `20260909120000_control_plane_integration.sql` cria a outbox durável, o marcador de primeiro login e os recibos idempotentes. O worker entrega eventos pendentes no início do processo e a cada 15 segundos. Eventos: `user.created`, `user.first_login`, `session.started`, `payment.succeeded`, `payment.failed` e `subscription.changed`.
+
+- `POST /api/admin/users/commands` — requer a autenticação administrativa existente e `Idempotency-Key`. Aceita `role.set`, `status.set`, `plan.set`, `access.grant` e `user.delete`.
+- `GET /api/admin/users/sync?page=1&limit=100&updated_after=<ISO>` — snapshot paginado para reconciliação. `updated_after` é opcional.
+
+Formato de comando:
+
+```json
+{
+  "command": "role.set",
+  "external_user_id": "<uuid>",
+  "organization_id": "<uuid opcional>",
+  "payload": { "role": "vendedor" }
+}
+```
 
 ## Deploy Render
 

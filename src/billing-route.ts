@@ -5,6 +5,11 @@ import type { ContentfulStatusCode } from "hono/utils/http-status";
 import Stripe from "stripe";
 import { mintBillingUnlockToken, verifyBillingUnlockToken } from "./billing-unlock-token.js";
 import { resolveBearerSession } from "./bearer-session.js";
+import {
+  createDashboardEvent,
+  dashboardEventId,
+  publishDashboardEvent,
+} from "./dashboard-publisher.js";
 import { jsonFail, jsonOk } from "./json-response.js";
 import { supabaseAdmin } from "./supabase/admin-client.js";
 
@@ -527,12 +532,17 @@ billingRoute.post("/checkout-session", async (c) => {
     cancel_url: cancelUrl,
     client_reference_id: `${organizationId}:${userId}`,
     metadata: {
+      product: "2avendas",
       organization_id: organizationId,
+      external_user_id: userId,
       payer_user_id: userId,
     },
     subscription_data: {
       metadata: {
+        product: "2avendas",
         organization_id: organizationId,
+        external_user_id: userId,
+        payer_user_id: userId,
       },
     },
     ...(customerId
@@ -651,8 +661,82 @@ billingRoute.post("/webhook", async (c) => {
           const { error: orgErr2 } = await supabaseAdmin.from("organizations").update(patch).eq("id", orgId);
           if (orgErr2) throw new Error(orgErr2.message);
         }
+        if (event.type === "checkout.session.async_payment_succeeded" || session.payment_status === "paid") {
+          await publishDashboardEvent(
+            createDashboardEvent("payment.succeeded", {
+              eventId: dashboardEventId(event.id, "payment.succeeded"),
+              externalUserId: payerUserId ?? orgId,
+              organizationId: orgId,
+              email: session.customer_details?.email ?? session.customer_email,
+              occurredAt: new Date(event.created * 1000).toISOString(),
+              payload: {
+                stripe_event_id: event.id,
+                checkout_session_id: session.id,
+                subscription_id: subId,
+                customer_id: customerId,
+                amount_total: session.amount_total,
+                currency: session.currency,
+                payment_status: session.payment_status,
+              },
+            }),
+          );
+        }
         break;
       }
+      case "checkout.session.async_payment_failed": {
+        const session = event.data.object as Stripe.Checkout.Session;
+        const orgId = session.metadata?.organization_id ?? null;
+        const userId = session.metadata?.external_user_id ?? session.metadata?.payer_user_id ?? orgId;
+        if (userId) {
+          await publishDashboardEvent(
+            createDashboardEvent("payment.failed", {
+              eventId: dashboardEventId(event.id, "payment.failed"),
+              externalUserId: userId,
+              organizationId: orgId,
+              email: session.customer_details?.email ?? session.customer_email,
+              occurredAt: new Date(event.created * 1000).toISOString(),
+              payload: {
+                stripe_event_id: event.id,
+                checkout_session_id: session.id,
+                amount_total: session.amount_total,
+                currency: session.currency,
+                payment_status: session.payment_status,
+              },
+            }),
+          );
+        }
+        break;
+      }
+      case "invoice.payment_failed": {
+        const invoice = event.data.object as Stripe.Invoice;
+        const subscriptionId =
+          typeof invoice.parent?.subscription_details?.subscription === "string"
+            ? invoice.parent.subscription_details.subscription
+            : null;
+        const customerId = typeof invoice.customer === "string" ? invoice.customer : null;
+        const invoiceMetadata = invoice.parent?.subscription_details?.metadata ?? invoice.metadata;
+        await publishDashboardEvent(
+          createDashboardEvent("payment.failed", {
+            eventId: dashboardEventId(event.id, "payment.failed"),
+            externalUserId: invoiceMetadata?.external_user_id ?? customerId ?? event.id,
+            organizationId: invoiceMetadata?.organization_id,
+            email: invoice.customer_email,
+            occurredAt: new Date(event.created * 1000).toISOString(),
+            payload: {
+              stripe_event_id: event.id,
+              invoice_id: invoice.id,
+              subscription_id: subscriptionId,
+              customer_id: customerId,
+              amount_due: invoice.amount_due,
+              amount_paid: invoice.amount_paid,
+              currency: invoice.currency,
+              attempt_count: invoice.attempt_count,
+            },
+          }),
+        );
+        break;
+      }
+      case "customer.subscription.created":
       case "customer.subscription.updated": {
         const sub = event.data.object as Stripe.Subscription;
         const orgIdMeta = sub.metadata?.organization_id;
@@ -674,6 +758,21 @@ billingRoute.post("/webhook", async (c) => {
             })
             .eq("stripe_subscription_id", sub.id);
         }
+        await publishDashboardEvent(
+          createDashboardEvent("subscription.changed", {
+            eventId: dashboardEventId(event.id, "subscription.changed"),
+            externalUserId: sub.metadata?.external_user_id ?? orgIdMeta ?? sub.id,
+            organizationId: orgIdMeta,
+            occurredAt: new Date(event.created * 1000).toISOString(),
+            payload: {
+              stripe_event_id: event.id,
+              subscription_id: sub.id,
+              customer_id: typeof sub.customer === "string" ? sub.customer : sub.customer.id,
+              status: sub.status,
+              cancel_at_period_end: sub.cancel_at_period_end,
+            },
+          }),
+        );
         break;
       }
       case "customer.subscription.deleted": {
@@ -685,6 +784,22 @@ billingRoute.post("/webhook", async (c) => {
             stripe_subscription_id: null,
           })
           .eq("stripe_subscription_id", sub.id);
+        const orgIdMeta = sub.metadata?.organization_id;
+        await publishDashboardEvent(
+          createDashboardEvent("subscription.changed", {
+            eventId: dashboardEventId(event.id, "subscription.changed"),
+            externalUserId: sub.metadata?.external_user_id ?? orgIdMeta ?? sub.id,
+            organizationId: orgIdMeta,
+            occurredAt: new Date(event.created * 1000).toISOString(),
+            payload: {
+              stripe_event_id: event.id,
+              subscription_id: sub.id,
+              customer_id: typeof sub.customer === "string" ? sub.customer : sub.customer.id,
+              status: "canceled",
+              cancel_at_period_end: sub.cancel_at_period_end,
+            },
+          }),
+        );
         break;
       }
       default:

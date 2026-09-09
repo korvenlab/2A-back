@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { resolveBearerSession } from "./bearer-session.js";
+import { drainDashboardOutbox } from "./dashboard-publisher.js";
 import { jsonFail, jsonOk } from "./json-response.js";
 import { supabaseAdmin } from "./supabase/admin-client.js";
 
@@ -80,6 +81,19 @@ sessionRoute.get("/menu", async (c) => {
   const resolved = await resolveBearerSession(token);
   if (!resolved.ok) {
     return jsonFail(c, resolved.status as ContentfulStatusCode, resolved.message, resolved.code);
+  }
+
+  const sessionOccurredAt = new Date().toISOString();
+  const { error: sessionEventError } = await (supabaseAdmin as any).rpc("record_dashboard_session", {
+    p_user_id: resolved.data.userId,
+    p_organization_id: resolved.data.organizationId,
+    p_email: resolved.data.email,
+    p_occurred_at: sessionOccurredAt,
+  });
+  if (sessionEventError) {
+    console.error("[session] dashboard event enqueue failed:", sessionEventError.message);
+  } else {
+    void drainDashboardOutbox();
   }
 
   const {
